@@ -25,19 +25,6 @@ from app.vector_store import SQLiteVectorStore, VectorHit
 
 DATASET_ROOT = Path(__file__).resolve().parents[2] / "data_samples" / "chemical_rag_dataset"
 DEFAULT_REVIEW_TASK = "请基于上传资料执行化工物料准入风险预审。"
-CHECK_TYPE_LABELS = {
-    "material": "物料合规",
-    "process": "工艺适用性",
-    "storage": "储运合规",
-    "regulatory": "法规初筛",
-}
-CHECK_TYPE_AGENT_MAP = {
-    "material": "物料",
-    "process": "工艺",
-    "storage": "储运",
-    "regulatory": "法规",
-}
-DEFAULT_CHECK_TYPES = ["material", "process", "storage", "regulatory"]
 QUERY_PRESETS = [
     {
         "id": "sds_completeness",
@@ -201,7 +188,6 @@ class ChemicalRagRunner:
         *,
         title: str,
         review_task: str | None = None,
-        check_types: list[str] | None = None,
         target_markets: list[str],
         top_k: int,
         sds: dict[str, Any],
@@ -213,8 +199,7 @@ class ChemicalRagRunner:
         case = {
             "case_id": case_id,
             "title": title,
-            "review_task": self._review_task_from_check_types(check_types) if check_types else (review_task or DEFAULT_REVIEW_TASK).strip() or DEFAULT_REVIEW_TASK,
-            "check_types": self._normalize_check_types(check_types),
+            "review_task": (review_task or DEFAULT_REVIEW_TASK).strip() or DEFAULT_REVIEW_TASK,
             "scenario_tags": ["现场上传", "非预设案例"],
             "target_markets": target_markets,
             "sds_path": sds["filename"],
@@ -286,8 +271,6 @@ class ChemicalRagRunner:
         knowledge_pack = self._knowledge_pack_payload()
         review_task = str(case.get("review_task") or DEFAULT_REVIEW_TASK).strip() or DEFAULT_REVIEW_TASK
         case["review_task"] = review_task
-        check_types = self._normalize_check_types(case.get("check_types"))
-        case["check_types"] = check_types
         query = self._build_query(case, components, process)
         task_decomposition = self._decompose_review_task(review_task, case, parsed_sds, formula, components, process)
         rag_queries = self._build_rag_queries(task_decomposition, case, components, process)
@@ -304,17 +287,17 @@ class ChemicalRagRunner:
         retrieved = self._merge_retrievals(retrieval_by_agent)
 
         base_hits = self._base_rule_hits(case, parsed_sds, formula, components, process, retrieved)
-        completeness_precheck = self._deterministic_precheck(parsed_sds, formula, process, components)
+        completeness_agent_result = self._with_llm(
+            "资料完整性",
+            self._completeness_agent(parsed_sds, formula, process, components),
+            retrieval_by_agent.get("资料完整性", retrieved),
+            enabled=use_llm,
+        )
         base_agent_results = {
             "物料": self._material_agent(components),
             "工艺": self._process_agent(components, process),
             "储运": self._storage_agent(components, formula, parsed_sds, process),
             "法规": self._regulatory_agent(case, components, retrieval_by_agent.get("法规", retrieved), parsed_sds),
-        }
-        base_agent_results = {
-            agent_name: result
-            for agent_name, result in base_agent_results.items()
-            if agent_name in {CHECK_TYPE_AGENT_MAP[item] for item in check_types}
         }
         sub_agent_results = self._with_llm_concurrently(
             base_agent_results,
@@ -343,7 +326,7 @@ class ChemicalRagRunner:
             task_decomposition=task_decomposition,
             rag_queries=rag_queries,
             retrieval_by_agent=retrieval_by_agent,
-            agent_results=sub_agent_results,
+            agent_results={"资料完整性": completeness_agent_result, **sub_agent_results},
             parsed_sds=parsed_sds,
             formula=formula,
             process=process,
@@ -370,7 +353,6 @@ class ChemicalRagRunner:
             agent_branches=agent_branches,
             chief_synthesis=chief_synthesis,
             knowledge_pack=knowledge_pack,
-            precheck=completeness_precheck,
         )
         nodes = self._nodes(
             case=case,
@@ -397,7 +379,6 @@ class ChemicalRagRunner:
             "case_id": case["case_id"],
             "case_source": case_source,
             "review_task": review_task,
-            "check_types": check_types,
             "knowledge_pack": knowledge_pack,
             "generated_at": utc_now(),
             "graph": {
@@ -411,7 +392,6 @@ class ChemicalRagRunner:
                 "llm_provider": self.llm_client.last_provider,
                 "llm_model": self.ai_config.llm_model,
                 "rules_first": True,
-                "document_completeness": "deterministic_function_precheck",
             },
             "verdict": chief["verdict"],
             "reasons": chief["reasons"],
@@ -931,7 +911,6 @@ class ChemicalRagRunner:
         terms = [
             case["title"],
             case.get("review_task", DEFAULT_REVIEW_TASK),
-            " ".join(CHECK_TYPE_LABELS[item] for item in self._normalize_check_types(case.get("check_types"))),
             "SDS formula process storage compatibility chemical compliance RAG",
             "incompatibility oxidizer flammable hypochlorite acid benzene unknown substance review TSCA SVHC hazardous catalog storage transport UN revision",
             " ".join(case["target_markets"]),
@@ -941,24 +920,6 @@ class ChemicalRagRunner:
             terms.extend([component["cas"], component["name"], component.get("raw_name", "")])
             terms.extend(component.get("tags", []))
         return " ".join(str(term) for term in terms if term)
-
-    def _normalize_check_types(self, check_types: list[str] | str | None) -> list[str]:
-        if check_types is None:
-            return list(DEFAULT_CHECK_TYPES)
-        if isinstance(check_types, str):
-            raw_items = [item.strip() for item in check_types.replace(";", ",").split(",")]
-        else:
-            raw_items = [str(item).strip() for item in check_types]
-        normalized = []
-        for item in raw_items:
-            key = item.lower()
-            if key in CHECK_TYPE_LABELS and key not in normalized:
-                normalized.append(key)
-        return normalized or list(DEFAULT_CHECK_TYPES)
-
-    def _review_task_from_check_types(self, check_types: list[str] | str | None) -> str:
-        labels = [CHECK_TYPE_LABELS[item] for item in self._normalize_check_types(check_types)]
-        return f"执行固定检查项：{'、'.join(labels)}。"
 
     def _decompose_review_task(
         self,
@@ -971,37 +932,45 @@ class ChemicalRagRunner:
     ) -> list[dict[str, Any]]:
         component_summary = self._component_summary(components)
         target_markets = "、".join(case.get("target_markets", []))
-        task_templates = {
-            "material": {
+        missing_sds = "、".join(parsed_sds.missing_fields) if parsed_sds.missing_fields else "无"
+        missing_process = "、".join(process.get("missing_fields", [])) if process.get("missing_fields") else "无"
+        return [
+            {
+                "agent": "资料完整性",
+                "task_id": "document_completeness",
+                "review_task": review_task,
+                "objective": "核对 SDS、配方表、工艺说明是否足以支撑合规预审。",
+                "inputs": f"SDS 缺失字段：{missing_sds}；工艺缺失字段：{missing_process}；配方成分数：{formula['component_count']}。",
+            },
+            {
                 "agent": "物料",
                 "task_id": "material_identification",
                 "review_task": review_task,
                 "objective": "识别物质 CAS、浓度、危害标签和企业红线信号。",
                 "inputs": component_summary,
             },
-            "process": {
+            {
                 "agent": "工艺",
                 "task_id": "process_applicability",
                 "review_task": review_task,
                 "objective": "结合用户任务判断温度、压力、混配步骤与目标用途是否存在工艺安全风险。",
                 "inputs": self._process_summary(process),
             },
-            "storage": {
+            {
                 "agent": "储运",
                 "task_id": "storage_transport_compatibility",
                 "review_task": review_task,
                 "objective": "判断配方内物质、储存条件和运输信息是否存在兼容性冲突。",
                 "inputs": f"{component_summary}；储存条件：{self._storage_value(process, formula)}。",
             },
-            "regulatory": {
+            {
                 "agent": "法规",
                 "task_id": "regulatory_screening",
                 "review_task": review_task,
                 "objective": "面向目标市场执行危化品、SVHC、TSCA/HCS 和内部规则的 RAG 初筛。",
                 "inputs": f"目标市场：{target_markets}；{component_summary}。",
             },
-        }
-        return [task_templates[item] for item in self._normalize_check_types(case.get("check_types")) if item in task_templates]
+        ]
 
     def _build_rag_queries(
         self,
@@ -1016,6 +985,7 @@ class ChemicalRagRunner:
             self._component_query_terms(components),
         ]
         agent_terms = {
+            "资料完整性": "SDS 16 sections revision date supplier CAS concentration process temperature pressure missing fields document completeness",
             "物料": "CAS EC substance identity hazard tags unknown substance benzene SVHC hazardous catalog",
             "工艺": "process temperature pressure mixing cleaning electronics oxidizer high temperature incompatible operation",
             "储运": "storage transport UN number compatibility oxidizer flammable acid hypochlorite segregation",
@@ -1359,27 +1329,6 @@ class ChemicalRagRunner:
         if missing:
             return self._agent_result("复核", ["process_parameters_missing"], [f"资料缺口需复核：{'、'.join(missing)}。"], 0.52)
         return self._agent_result("合规", ["sds_complete", "process_parameters_present"], ["SDS、配方表和工艺关键字段已满足预审输入要求。"], 0.88)
-
-    def _deterministic_precheck(
-        self,
-        parsed_sds: Any,
-        formula: dict[str, Any],
-        process: dict[str, Any],
-        components: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        checklist = self._review_checklist(parsed_sds, formula, process, components)
-        document_quality = self._document_quality(checklist)
-        missing = [item for item in checklist if item["status"] == "missing"]
-        return {
-            "mode": "deterministic_function",
-            "agent_removed": True,
-            "description": "资料完整性由章节、字段和关键词规则函数判断，不进入 LLM Agent 编排。",
-            "status": document_quality["status"],
-            "score": document_quality["score"],
-            "blocking_gaps": document_quality["blocking_gaps"],
-            "missing_fields": [item["field"] for item in missing],
-            "field_check_count": len(checklist),
-        }
 
     def _agent_result(self, verdict: str, hit_rules: list[str], reasons: list[str], confidence: float) -> dict[str, Any]:
         return {
@@ -1764,7 +1713,6 @@ class ChemicalRagRunner:
         agent_branches: dict[str, dict[str, Any]] | None = None,
         chief_synthesis: dict[str, Any] | None = None,
         knowledge_pack: dict[str, Any] | None = None,
-        precheck: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         documents = documents or {}
         review_task = review_task or case.get("review_task") or DEFAULT_REVIEW_TASK
@@ -1799,7 +1747,6 @@ class ChemicalRagRunner:
         ]
         checklist = self._review_checklist(parsed_sds, formula, process, components)
         document_quality = self._document_quality(checklist)
-        precheck = precheck or self._deterministic_precheck(parsed_sds, formula, process, components)
         risk_items = self._review_risk_items(chief, rule_hits, evidences)
         evidence_chain = [
             {
@@ -1813,18 +1760,8 @@ class ChemicalRagRunner:
             for evidence in evidences
         ]
         report_summary = self._review_report_summary(case, chief, checklist, risk_items, evidence_chain)
-        supplement_actions = self._supplement_actions(document_quality)
-        structured_report = self._structured_report(
-            case=case,
-            chief=chief,
-            document_quality=document_quality,
-            supplement_actions=supplement_actions,
-            risk_items=risk_items,
-            evidences=evidence_chain,
-        )
         return {
             "review_task": review_task,
-            "check_types": case.get("check_types", DEFAULT_CHECK_TYPES),
             "knowledge_pack": knowledge_pack or {},
             "task_decomposition": task_decomposition,
             "agent_branch_summary": [
@@ -1840,11 +1777,9 @@ class ChemicalRagRunner:
             ],
             "chief_review_summary": chief_synthesis,
             "source_documents": source_documents,
-            "precheck": precheck,
             "extracted_checklist": checklist,
             "document_quality": document_quality,
-            "supplement_actions": supplement_actions,
-            "structured_report": structured_report,
+            "supplement_actions": self._supplement_actions(document_quality),
             "risk_items": risk_items,
             "evidence_chain": evidence_chain,
             "report_summary": report_summary,
@@ -2034,95 +1969,6 @@ class ChemicalRagRunner:
             "disclaimer": "本结果为 AI 辅助预审，不构成最终法规、法律或 EHS 合规意见。",
         }
 
-    def _structured_report(
-        self,
-        *,
-        case: dict[str, Any],
-        chief: dict[str, Any],
-        document_quality: dict[str, Any],
-        supplement_actions: list[dict[str, Any]],
-        risk_items: list[dict[str, Any]],
-        evidences: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        sections: dict[str, list[dict[str, Any]]] = {dimension: [] for dimension in ["资料完整性", "物料", "工艺", "储运", "法规"]}
-        sequence = 1
-        for gap in document_quality.get("blocking_gaps", []):
-            action = next((item for item in supplement_actions if item["field"] == gap["field"]), None)
-            sections["资料完整性"].append(
-                {
-                    "id": sequence,
-                    "verdict": "复核",
-                    "rule_id": f"precheck:{gap['field']}",
-                    "rule_excerpt": gap["impact"],
-                    "user_excerpt": gap["evidence"],
-                    "recommendation": action["action"] if action else f"补充或确认：{gap['label']}",
-                    "source": gap["source"],
-                }
-            )
-            sequence += 1
-
-        for item in risk_items:
-            if item["verdict"] == "合规":
-                continue
-            rule_id = (item.get("rule_refs") or ["manual_review"])[0]
-            evidence = self._evidence_for_risk(item, evidences)
-            dimension = self._dimension_for_rule(rule_id)
-            sections.setdefault(dimension, []).append(
-                {
-                    "id": sequence,
-                    "verdict": item["verdict"],
-                    "rule_id": rule_id,
-                    "rule_excerpt": self._rule_excerpt(rule_id, item["reason"], evidences),
-                    "user_excerpt": evidence["snippet"] if evidence else item["reason"],
-                    "recommendation": item["recommended_action"],
-                    "source": evidence["ref"] if evidence else "review_workbench",
-                }
-            )
-            sequence += 1
-
-        section_payload = [
-            {"dimension": dimension, "items": items}
-            for dimension, items in sections.items()
-            if items
-        ]
-        return {
-            "format": "structured_decision_report_v1",
-            "title": f"{case['title']}结构化整改报告",
-            "final_verdict": chief["verdict"],
-            "included_verdicts": ["不合规", "复核"],
-            "excluded_verdicts": ["合规"],
-            "sections": section_payload,
-            "empty_state": "未发现不合规或复核项。" if not section_payload else "",
-            "disclaimer": "本报告为 AI 辅助预审输出，最终结论需由 EHS/法规人员确认。",
-        }
-
-    def _evidence_for_risk(self, risk_item: dict[str, Any], evidences: list[dict[str, Any]]) -> dict[str, Any] | None:
-        refs = set(risk_item.get("evidence_refs") or [])
-        for evidence in evidences:
-            if evidence["ref"] in refs:
-                return evidence
-        for evidence in evidences:
-            if evidence["type"] == "资料":
-                return evidence
-        return evidences[0] if evidences else None
-
-    def _rule_excerpt(self, rule_id: str, fallback: str, evidences: list[dict[str, Any]]) -> str:
-        for evidence in evidences:
-            if evidence["ref"].startswith(f"rule:{rule_id}:"):
-                return evidence["snippet"]
-        return fallback
-
-    def _dimension_for_rule(self, rule_id: str) -> str:
-        if rule_id.startswith("precheck:") or rule_id in {"sds_missing_sections", "process_parameters_missing", "formula_components_missing"}:
-            return "资料完整性"
-        if rule_id in {"incompatibility_oxidizer_flammable", "incompatibility_hypochlorite_acid", "oxidizer_high_temperature_process"}:
-            return "工艺"
-        if rule_id in {"flammable_storage_missing", "transport_un_mismatch"}:
-            return "储运"
-        if rule_id in {"hazardous_catalog_match", "svhc_threshold_match", "tsca_inventory_match", "knowledge_no_match_review", "knowledge_pack_missing_review", "sds_revision_outdated"}:
-            return "法规"
-        return "物料"
-
     def _nodes(
         self,
         *,
@@ -2175,17 +2021,13 @@ class ChemicalRagRunner:
                 "retrieved_chunk_count": len(retrieved),
                 "top_scores": [item.score for item in retrieved],
             },
+            "material_agent": agent_branches.get("物料", sub_agent_results["物料"]),
+            "process_agent": agent_branches.get("工艺", sub_agent_results["工艺"]),
+            "storage_agent": agent_branches.get("储运", sub_agent_results["储运"]),
+            "regulatory_agent": agent_branches.get("法规", sub_agent_results["法规"]),
             "cross_check": cross_check,
             "chief_review": {"chief_review": chief, "chief_synthesis": chief_synthesis},
         }
-        agent_node_map = {
-            "material_agent": ("物料", {"skipped": True, "reason": "未选择物料合规检查项。"}),
-            "process_agent": ("工艺", {"skipped": True, "reason": "未选择工艺适用性检查项。"}),
-            "storage_agent": ("储运", {"skipped": True, "reason": "未选择储运合规检查项。"}),
-            "regulatory_agent": ("法规", {"skipped": True, "reason": "未选择法规初筛检查项。"}),
-        }
-        for node_id, (agent_name, skipped) in agent_node_map.items():
-            outputs[node_id] = agent_branches.get(agent_name) or sub_agent_results.get(agent_name) or skipped
         if include_evaluation:
             outputs["load_task"]["expected_verdict"] = case["expected_verdict"]
             outputs["evaluate"] = evaluation or {}

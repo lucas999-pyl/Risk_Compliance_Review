@@ -27,17 +27,17 @@ def test_upload_review_is_driven_by_review_task_and_agent_branch_queries(tmp_pat
     assert "verdict_matched" not in payload
 
     decomposition = payload["task_decomposition"]
-    assert [item["agent"] for item in decomposition] == ["物料", "工艺", "储运", "法规"]
+    assert [item["agent"] for item in decomposition] == ["资料完整性", "物料", "工艺", "储运", "法规"]
     assert all(ELECTRONICS_REVIEW_TASK in item["review_task"] for item in decomposition)
 
     rag_queries = payload["rag_queries"]
-    assert set(rag_queries) == {"物料", "工艺", "储运", "法规"}
+    assert set(rag_queries) == {"资料完整性", "物料", "工艺", "储运", "法规"}
     assert all(ELECTRONICS_REVIEW_TASK in query for query in rag_queries.values())
     assert len(set(rag_queries.values())) == len(rag_queries)
     assert payload["retrieval"]["queries"] == list(rag_queries.values())
 
     branches = payload["agent_branches"]
-    assert set(branches) == {"物料", "工艺", "储运", "法规"}
+    assert set(branches) == {"资料完整性", "物料", "工艺", "储运", "法规"}
     for agent_name, branch in branches.items():
         assert branch["task"]
         assert branch["input_summary"]
@@ -56,51 +56,8 @@ def test_upload_review_is_driven_by_review_task_and_agent_branch_queries(tmp_pat
     workbench = payload["review_workbench"]
     assert workbench["review_task"] == ELECTRONICS_REVIEW_TASK
     assert workbench["task_decomposition"] == decomposition
-    assert workbench["precheck"]["mode"] == "deterministic_function"
     assert workbench["agent_branch_summary"]
     assert workbench["chief_review_summary"]["final_verdict"] == "不合规"
-
-
-def test_upload_review_accepts_fixed_check_types_and_excludes_completeness_agent(tmp_path: Path) -> None:
-    client = _make_client(tmp_path)
-    client.post("/chemical/knowledge/import-demo-pack")
-
-    payload = _upload_sample(
-        client,
-        "incompatible_oxidizer_flammable",
-        check_types=["material", "process", "storage", "regulatory"],
-    )
-
-    assert payload["check_types"] == ["material", "process", "storage", "regulatory"]
-    assert payload["review_task"] == "执行固定检查项：物料合规、工艺适用性、储运合规、法规初筛。"
-    assert [item["agent"] for item in payload["task_decomposition"]] == ["物料", "工艺", "储运", "法规"]
-    assert set(payload["rag_queries"]) == {"物料", "工艺", "储运", "法规"}
-    assert set(payload["agent_branches"]) == {"物料", "工艺", "储运", "法规"}
-    assert payload["review_workbench"]["precheck"]["mode"] == "deterministic_function"
-    assert payload["review_workbench"]["precheck"]["agent_removed"] is True
-
-
-def test_structured_report_lists_only_non_compliant_and_review_items(tmp_path: Path) -> None:
-    client = _make_client(tmp_path)
-    client.post("/chemical/knowledge/import-demo-pack")
-
-    payload = _upload_sample(
-        client,
-        "incompatible_oxidizer_flammable",
-        check_types=["material", "process", "storage", "regulatory"],
-    )
-
-    report = payload["review_workbench"]["structured_report"]
-    assert report["format"] == "structured_decision_report_v1"
-    assert report["included_verdicts"] == ["不合规", "复核"]
-    assert report["excluded_verdicts"] == ["合规"]
-    assert report["sections"]
-    assert all(section["dimension"] in {"物料", "工艺", "储运", "法规", "资料完整性"} for section in report["sections"])
-    assert all(item["verdict"] in {"不合规", "复核"} for section in report["sections"] for item in section["items"])
-    assert any(item["rule_id"] for section in report["sections"] for item in section["items"])
-    assert all(item["rule_excerpt"] for section in report["sections"] for item in section["items"])
-    assert all(item["user_excerpt"] for section in report["sections"] for item in section["items"])
-    assert all(item["recommendation"] for section in report["sections"] for item in section["items"])
 
 
 def test_upload_review_without_review_task_uses_conservative_default(tmp_path: Path) -> None:
@@ -128,12 +85,7 @@ def test_unknown_or_missing_package_is_reviewed_by_chief_synthesis(tmp_path: Pat
     assert any(keyword in review_text for keyword in ["未知", "缺少", "工艺", "复核"])
 
 
-def _upload_sample(
-    client: TestClient,
-    sample_id: str,
-    review_task: str | None = None,
-    check_types: list[str] | None = None,
-) -> dict:
+def _upload_sample(client: TestClient, sample_id: str, review_task: str | None = None) -> dict:
     files = {
         "sds_file": (f"{sample_id}_sds.txt", (SAMPLES_ROOT / f"{sample_id}_sds.txt").read_bytes(), "text/plain"),
         "formula_file": (f"{sample_id}_formula.txt", (SAMPLES_ROOT / f"{sample_id}_formula.txt").read_bytes(), "text/plain"),
@@ -146,8 +98,6 @@ def _upload_sample(
     }
     if review_task is not None:
         data["review_task"] = review_task
-    if check_types is not None:
-        data["check_types"] = ",".join(check_types)
     response = client.post("/chemical/upload-review", data=data, files=files)
     assert response.status_code == 201, response.text
     return response.json()

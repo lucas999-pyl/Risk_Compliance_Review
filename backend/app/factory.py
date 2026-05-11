@@ -255,7 +255,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def chemical_upload_review(
         title: str = Form(...),
         review_task: str = Form("请基于上传资料执行化工物料准入风险预审。"),
-        check_types: str = Form(""),
         target_markets: str = Form("CN,EU,US"),
         top_k: int = Form(5),
         sds_file: UploadFile = File(...),
@@ -267,7 +266,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return runner.run_uploaded_documents(
             title=title,
             review_task=review_task,
-            check_types=_parse_check_types(check_types),
             target_markets=_parse_target_markets(target_markets),
             top_k=top_k,
             sds=runner.uploaded_document_from_bytes(
@@ -306,10 +304,3 @@ def _parse_target_markets(value: str) -> list[str]:
     markets = [item.strip().upper() for item in value.replace(";", ",").split(",") if item.strip()]
     filtered = [item for item in markets if item in allowed]
     return filtered or ["CN", "EU", "US"]
-
-
-def _parse_check_types(value: str) -> list[str] | None:
-    allowed = {"material", "process", "storage", "regulatory"}
-    items = [item.strip().lower() for item in value.replace(";", ",").split(",") if item.strip()]
-    filtered = [item for item in items if item in allowed]
-    return filtered or None
