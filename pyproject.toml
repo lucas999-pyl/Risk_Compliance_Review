@@ -1,7 +1,7 @@
 [project]
 name = "risk-compliance-review"
 version = "0.1.0"
-description = "Risk compliance review technical demo"
+description = "Risk compliance review RAG service"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
