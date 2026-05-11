@@ -142,6 +142,9 @@ def test_upload_review_with_official_pack_returns_document_quality_and_supplemen
     assert payload["review_workbench"]["supplement_actions"]
     assert any("补充" in action["action"] for action in payload["review_workbench"]["supplement_actions"])
     assert any("工艺" in item for item in payload["chief_synthesis"]["review_items"])
+    assert payload["review_workbench"]["precheck"]["mode"] == "deterministic_function"
+    assert payload["review_workbench"]["precheck"]["agent_removed"] is True
+    assert any(section["dimension"] == "资料完整性" for section in payload["review_workbench"]["structured_report"]["sections"])
 
 
 def test_query_presets_are_business_ready(tmp_path: Path) -> None:

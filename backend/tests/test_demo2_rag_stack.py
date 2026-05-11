@@ -331,7 +331,8 @@ def test_run_trace_calls_llm_agents_concurrently(tmp_path: Path) -> None:
     elapsed = time.perf_counter() - started
 
     assert payload["agent_orchestration"]["llm_provider"] == "openai_compatible"
-    assert set(calls) == {"资料完整性", "物料", "工艺", "储运", "法规"}
+    assert set(calls) == {"物料", "工艺", "储运", "法规"}
+    assert payload["review_workbench"]["precheck"]["mode"] == "deterministic_function"
     assert elapsed < 0.35
     assert all(result["llm_used"] for result in payload["sub_agent_results"].values())
 

@@ -174,6 +174,12 @@
         margin-top: -4px;
       }
 
+      .check-type-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
       .suggestion-chip {
         display: inline-flex;
         align-items: center;
@@ -191,6 +197,24 @@
         width: auto;
         min-height: auto;
         margin: 0;
+      }
+
+      .check-type-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px;
+        background: #f8faf8;
+        color: var(--ink);
+      }
+
+      .check-type-card input {
+        width: auto;
+        min-height: auto;
+        margin-top: 3px;
       }
 
       .tabs,
@@ -632,23 +656,14 @@
             案件标题
             <input id="uploadTitle" value="供应商资料包准入预审" />
           </label>
-          <label>
-            审查任务
-            <textarea id="reviewTask">请判断该供应商清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。</textarea>
-          </label>
-          <div class="task-suggestions">
-            <span class="suggestion-chip">任务推荐，可多选</span>
-            <span id="reviewTaskPresets" class="task-suggestions"></span>
-          </div>
-          <div class="actions">
-            <button id="applySelectedReviewTasks" class="secondary">应用推荐任务</button>
-            <button id="clearSelectedReviewTasks" class="secondary">清空选择</button>
-          </div>
-          <div class="list" id="selectedReviewTasks"></div>
-          <button class="collapse-toggle" data-target="reviewTaskHistory" aria-expanded="false">审查任务历史</button>
-          <div class="list collapsible collapsed" id="reviewTaskHistory"></div>
-          <div class="actions">
-            <button id="clearReviewTaskHistory" class="secondary">清空任务历史</button>
+          <div>
+            <h3>标准检查项</h3>
+            <div class="check-type-grid">
+              <label class="check-type-card"><input id="checkTypeMaterial" name="checkType" type="checkbox" value="material" checked /><span><strong>物料合规</strong><br />CAS、浓度、禁忌组合和企业红线。</span></label>
+              <label class="check-type-card"><input id="checkTypeProcess" name="checkType" type="checkbox" value="process" checked /><span><strong>工艺适用性</strong><br />温度、压力、混配步骤和用途风险。</span></label>
+              <label class="check-type-card"><input id="checkTypeStorage" name="checkType" type="checkbox" value="storage" checked /><span><strong>储运合规</strong><br />储存条件、UN 编号和兼容隔离。</span></label>
+              <label class="check-type-card"><input id="checkTypeRegulatory" name="checkType" type="checkbox" value="regulatory" checked /><span><strong>法规初筛</strong><br />CN/EU/US 清单和版本化证据。</span></label>
+            </div>
           </div>
           <div class="metric-grid">
             <label>上传 SDS<input id="sdsFile" type="file" accept=".txt,.pdf,text/plain,application/pdf" /></label>
@@ -674,6 +689,8 @@
           <h3>资料完整性与补件判断</h3>
           <span class="tag">抽取校验已收敛为补件判断</span>
           <div id="documentQuality" class="report-card"></div>
+          <h3>结构化整改报告</h3>
+          <div id="structuredReport" class="report-card"></div>
           <button class="collapse-toggle" data-target="extractedChecklist" aria-expanded="false">字段级清单</button>
           <div class="checklist-grid collapsible collapsed" id="extractedChecklist"></div>
           <h3>任务拆解</h3>
@@ -794,90 +811,10 @@
       }
 
       const QUERY_HISTORY_KEY = "chemicalRagQueryHistory";
-      const REVIEW_TASK_HISTORY_KEY = "chemicalRagReviewTaskHistory";
 
-      async function loadReviewTaskPresets() {
-        const payload = await api("/chemical/query-presets");
-        $("reviewTaskPresets").innerHTML = payload.presets
-          .map(
-            (preset) =>
-              `<label class="suggestion-chip"><input class="review-task-preset" type="checkbox" value="${escapeHtml(preset.query)}" data-title="${escapeHtml(preset.title)}" data-markets="${escapeHtml((preset.target_markets || []).join(","))}" /> ${escapeHtml(preset.title)}</label>`
-          )
-          .join("");
-        document.querySelectorAll(".review-task-preset").forEach((checkbox) =>
-          checkbox.addEventListener("change", renderSelectedReviewTasks)
-        );
-        renderSelectedReviewTasks();
-      }
-
-      function selectedReviewTaskInputs() {
-        return Array.from(document.querySelectorAll(".review-task-preset:checked"));
-      }
-
-      function renderSelectedReviewTasks() {
-        const selected = selectedReviewTaskInputs();
-        $("selectedReviewTasks").innerHTML = selected.length
-          ? selected
-              .map((item) => `<article class="pipeline-step"><strong>${escapeHtml(item.dataset.title)}</strong><span>${escapeHtml(item.value)}</span></article>`)
-              .join("")
-          : `<article class="pipeline-step"><strong>未选择审查任务</strong><span>可从高频审查任务中多选，或直接编辑上方文本框。</span></article>`;
-      }
-
-      function applySelectedReviewTasks() {
-        const selected = selectedReviewTaskInputs();
-        if (!selected.length) {
-          setStatus("请先选择至少一个高频审查任务。");
-          return;
-        }
-        const tasks = selected.map((item, index) => `${index + 1}. ${item.value}`);
-        $("reviewTask").value = tasks.join("\n");
-        const markets = [...new Set(selected.flatMap((item) => (item.dataset.markets || "").split(",").filter(Boolean)))];
-        if (markets.length) $("targetMarkets").value = markets.join(",");
-        rememberReviewTask($("reviewTask").value);
-        setStatus("已将选中的高频审查任务合并到审查任务文本框。");
-      }
-
-      function clearSelectedReviewTasks() {
-        document.querySelectorAll(".review-task-preset").forEach((item) => (item.checked = false));
-        renderSelectedReviewTasks();
-        setStatus("已清空高频审查任务选择。");
-      }
-
-      function readReviewTaskHistory() {
-        try {
-          return JSON.parse(localStorage.getItem(REVIEW_TASK_HISTORY_KEY) || "[]");
-        } catch {
-          return [];
-        }
-      }
-
-      function rememberReviewTask(task) {
-        const value = String(task || "").trim();
-        if (!value) return;
-        const history = [value, ...readReviewTaskHistory().filter((item) => item !== value)].slice(0, 10);
-        localStorage.setItem(REVIEW_TASK_HISTORY_KEY, JSON.stringify(history));
-        renderReviewTaskHistory();
-      }
-
-      function renderReviewTaskHistory() {
-        const history = readReviewTaskHistory();
-        $("reviewTaskHistory").innerHTML = history.length
-          ? history
-              .map((task) => `<article class="chunk"><button class="secondary review-task-history-item" data-task="${escapeHtml(task)}">${escapeHtml(task)}</button></article>`)
-              .join("")
-          : `<article class="chunk"><strong>审查任务历史</strong><span>运行审查或应用高频任务后保留最近 10 条，可一键复用。</span></article>`;
-        document.querySelectorAll(".review-task-history-item").forEach((button) =>
-          button.addEventListener("click", () => {
-            $("reviewTask").value = button.dataset.task || "";
-            setStatus("已从审查任务历史填入任务。");
-          })
-        );
-      }
-
-      function clearReviewTaskHistory() {
-        localStorage.removeItem(REVIEW_TASK_HISTORY_KEY);
-        renderReviewTaskHistory();
-        setStatus("审查任务历史已清空");
+      function selectedCheckTypes() {
+        const selected = Array.from(document.querySelectorAll('input[name="checkType"]:checked')).map((item) => item.value);
+        return selected.length ? selected : ["material", "process", "storage", "regulatory"];
       }
 
       function readQueryHistory() {
@@ -1016,13 +953,7 @@
           incompatible_oxidizer_flammable: "供应商 B 资料包准入预审",
           unknown_missing_process: "供应商 C 资料包准入预审",
         };
-        const tasks = {
-          compliant_water_cleaner: "请判断该供应商水性清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。",
-          incompatible_oxidizer_flammable: "请判断该供应商含乙醇/过氧化氢清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。",
-          unknown_missing_process: "请判断该研发中间体资料包是否满足供应商准入预审要求，缺失信息是否需要人工复核。",
-        };
         $("uploadTitle").value = titles[sampleId] || `供应商资料包预审：${sampleId}`;
-        $("reviewTask").value = tasks[sampleId] || "请基于上传资料执行化工物料准入风险预审。";
         setStatus(`已载入供应商资料包：${sampleId}`);
       }
 
@@ -1043,17 +974,16 @@
           setStatus("请先上传 SDS、配方表和工艺说明，或从供应商资料包一键载入。");
           return;
         }
-        setStatus("正在按审查任务拆解并运行多 query RAG/规则/多 Agent 审查...");
+        setStatus("正在按固定检查项运行资料预检、RAG/规则/多 Agent 审查...");
         const form = new FormData();
         form.append("title", $("uploadTitle").value);
-        form.append("review_task", $("reviewTask").value);
+        form.append("check_types", selectedCheckTypes().join(","));
         form.append("target_markets", $("targetMarkets").value);
         form.append("top_k", String(currentTopK()));
         form.append("sds_file", $("sdsFile").files[0]);
         form.append("formula_file", $("formulaFile").files[0]);
         form.append("process_file", $("processFile").files[0]);
         const trace = await api("/chemical/upload-review", { method: "POST", body: form });
-        rememberReviewTask($("reviewTask").value);
         renderTrace(trace);
         setStatus(`上传审查完成：${trace.run_id}`);
       }
@@ -1176,6 +1106,7 @@
         renderSourceDocuments(workbench.source_documents || []);
         renderTaskDecomposition(workbench.task_decomposition || trace.task_decomposition || []);
         renderDocumentQuality(workbench.document_quality, workbench.supplement_actions || []);
+        renderStructuredReport(workbench.structured_report);
         $("extractedChecklist").innerHTML = workbench.extracted_checklist
           .map(
             (item) => `
@@ -1243,6 +1174,42 @@
               )
               .join("")
           : `<article class="pipeline-step"><strong>任务拆解</strong><span>上传审查后显示多 Agent 子任务。</span></article>`;
+      }
+
+      function renderStructuredReport(report) {
+        if (!report) {
+          $("structuredReport").innerHTML = "<p>上传审查后显示不合规项和复核项。</p>";
+          return;
+        }
+        const sections = report.sections || [];
+        $("structuredReport").innerHTML = sections.length
+          ? `
+            <strong>${escapeHtml(report.title || "结构化整改报告")}</strong>
+            <p>${escapeHtml(report.final_verdict || "-")} · 仅列出不合规项和复核项，合规项不展开。</p>
+            ${sections
+              .map(
+                (section) => `
+                  <article class="pipeline-step">
+                    <strong>${escapeHtml(section.dimension)}</strong>
+                    ${(section.items || [])
+                      .map(
+                        (item) => `
+                          <div class="evidence">
+                            <strong>${item.id}. ${escapeHtml(item.verdict)} · ${escapeHtml(item.rule_id)}</strong>
+                            <p><b>违反规则：</b>${escapeHtml(item.rule_excerpt)}</p>
+                            <p><b>用户原文：</b>${escapeHtml(item.user_excerpt)}</p>
+                            <p><b>改进建议：</b>${escapeHtml(item.recommendation)}</p>
+                          </div>
+                        `
+                      )
+                      .join("")}
+                  </article>
+                `
+              )
+              .join("")}
+            <span>${escapeHtml(report.disclaimer || "")}</span>
+          `
+          : `<strong>${escapeHtml(report.title || "结构化整改报告")}</strong><p>${escapeHtml(report.empty_state || "未发现不合规或复核项。")}</p>`;
       }
 
       function renderSourceDocuments(documents) {
@@ -1430,15 +1397,10 @@
       $("loadChunks").addEventListener("click", loadChunks);
       $("searchKnowledge").addEventListener("click", searchKnowledge);
       $("clearQueryHistory").addEventListener("click", clearQueryHistory);
-      $("applySelectedReviewTasks").addEventListener("click", applySelectedReviewTasks);
-      $("clearSelectedReviewTasks").addEventListener("click", clearSelectedReviewTasks);
-      $("clearReviewTaskHistory").addEventListener("click", clearReviewTaskHistory);
       $("runUploadReview").addEventListener("click", runUploadReview);
       $("loadEval").addEventListener("click", loadEvaluation);
 
       renderQueryHistory();
-      renderReviewTaskHistory();
-      loadReviewTaskPresets().catch((error) => setStatus(error.message));
       refreshKnowledgeStatus()
         .then(() => setStatus("本地 API 可用"))
         .catch((error) => setStatus(error.message));

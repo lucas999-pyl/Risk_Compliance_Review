@@ -38,7 +38,7 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
     assert "/chemical/evaluation" in response.text
     assert "/chemical/knowledge/status" in response.text
     assert "/chemical/knowledge/upload-pack" in response.text
-    assert "/chemical/query-presets" in response.text
+    assert "/chemical/query-presets" not in response.text
     assert "/chemical/knowledge/search" in response.text
     assert "技术流程 Demo" not in response.text
     assert "鍖栧" not in response.text
@@ -114,17 +114,19 @@ def test_static_workbench_promotes_knowledge_base_and_upload_review() -> None:
 def test_static_workbench_is_task_driven_upload_review() -> None:
     html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert "审查任务" in html
+    assert "标准检查项" in html
     assert "供应商资料包" in html
     assert "供应商 A：水性清洗剂准入资料包" in html
     assert "供应商 B：含乙醇/过氧化氢清洗剂资料包" in html
     assert "供应商 C：研发中间体资料缺口包" in html
-    assert "任务拆解" in html
+    assert "结构化整改报告" in html
     assert "多 query RAG 召回" in html
     assert "Agent 分支分析" in html
     assert "主审汇总" in html
-    assert 'id="reviewTask"' in html
-    assert 'form.append("review_task", $("reviewTask").value);' in html
+    assert 'id="reviewTask"' not in html
+    assert 'form.append("review_task"' not in html
+    assert 'name="checkType"' in html
+    assert 'form.append("check_types", selectedCheckTypes().join(","));' in html
     assert "task_decomposition" in html
     assert "agent_branches" in html
     assert "chief_synthesis" in html
@@ -140,10 +142,10 @@ def test_static_workbench_uses_official_pack_and_business_query_workbench() -> N
     assert "manifest_file" in html
     assert "source_files" in html
     assert "/chemical/knowledge/upload-pack" in html
-    assert "/chemical/query-presets" in html
-    assert "任务推荐" in html
-    assert "审查任务历史" in html
-    assert "清空任务历史" in html
+    assert "/chemical/query-presets" not in html
+    assert "任务推荐" not in html
+    assert "审查任务历史" not in html
+    assert "清空任务历史" not in html
     assert "localStorage" in html
     assert "资料完整性与补件判断" in html
     assert "字段级清单" in html
@@ -156,16 +158,16 @@ def test_static_workbench_uses_official_pack_and_business_query_workbench() -> N
 def test_static_workbench_moves_presets_to_review_task_multi_select() -> None:
     html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert "任务推荐" in html
-    assert "reviewTaskPresets" in html
-    assert "selectedReviewTasks" in html
-    assert "reviewTaskHistory" in html
-    assert "clearReviewTaskHistory" in html
-    assert "applySelectedReviewTasks" in html
-    assert "chemicalRagReviewTaskHistory" in html
-    assert "task-suggestions" in html
-    assert "suggestion-chip" in html
-    assert "可多选" in html
+    assert "标准检查项" in html
+    assert "checkTypeMaterial" in html
+    assert "checkTypeProcess" in html
+    assert "checkTypeStorage" in html
+    assert "checkTypeRegulatory" in html
+    assert "reviewTaskPresets" not in html
+    assert "selectedReviewTasks" not in html
+    assert "reviewTaskHistory" not in html
+    assert "applySelectedReviewTasks" not in html
+    assert "chemicalRagReviewTaskHistory" not in html
     assert "向量检索实验" in html
     assert "检索 Query" in html
     assert "高频问题" not in html
