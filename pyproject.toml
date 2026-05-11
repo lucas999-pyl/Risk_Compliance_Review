@@ -1,0 +1,35 @@
+[project]
+name = "risk-compliance-review"
+version = "0.1.0"
+description = "Risk compliance review technical demo"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "pydantic>=2.8.0",
+  "pydantic-settings>=2.4.0",
+  "pypdf>=5.0.0",
+  "python-multipart>=0.0.9",
+  "uvicorn[standard]>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+]
+observability = [
+  "langfuse>=2.53.0",
+]
+agents = [
+  "langgraph>=0.2.60",
+  "litellm>=1.55.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["app*"]

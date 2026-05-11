@@ -1,0 +1,78 @@
+{
+  "pack_id": "official_chemical_compliance_pack_2026_05",
+  "version": "2026-05-official-pack",
+  "retrieved_at": "2026-05-09",
+  "description": "Official-first chemical compliance knowledge pack for RAG demo. Source texts are concise, attributable summaries and rule-oriented excerpts built from public official sources for demonstration, not final legal advice.",
+  "sources": [
+    {
+      "filename": "osha_hcs_sds_appendix_d.md",
+      "title": "OSHA HCS 2024 SDS and Appendix D Official Summary",
+      "jurisdiction": "US",
+      "source_type": "official_regulation_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "sds_completeness",
+      "source_url": "https://www.osha.gov/laws-regs/federalregister/2024-05-20",
+      "version": "HCS-2024-final-rule",
+      "effective_date": "2024-07-19",
+      "retrieved_at": "2026-05-09",
+      "license_note": "Public official OSHA source summarized for demo retrieval. Not a substitute for the official Federal Register text."
+    },
+    {
+      "filename": "echa_candidate_list_svhc.md",
+      "title": "ECHA Candidate List SVHC Official Summary",
+      "jurisdiction": "EU",
+      "source_type": "official_registry_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "restricted_substance_screening",
+      "source_url": "https://www.echa.europa.eu/en/candidate-list-table",
+      "version": "candidate-list-2026-01-demo-reference",
+      "effective_date": "2026-01-01",
+      "retrieved_at": "2026-05-09",
+      "license_note": "Public ECHA candidate list page summarized for demo retrieval. Verify current list directly with ECHA before business use."
+    },
+    {
+      "filename": "epa_tsca_inventory_access.md",
+      "title": "EPA TSCA Inventory Official Access Summary",
+      "jurisdiction": "US",
+      "source_type": "official_inventory_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "inventory_screening",
+      "source_url": "https://www.epa.gov/tsca-inventory/how-access-tsca-inventory",
+      "version": "TSCA-inventory-access-2026-demo-reference",
+      "effective_date": "2026-01-01",
+      "retrieved_at": "2026-05-09",
+      "license_note": "Public EPA TSCA Inventory access guidance summarized for demo retrieval. Confirm active/inactive status with EPA systems before business use."
+    },
+    {
+      "filename": "mem_hazardous_chemicals_catalog_2015.md",
+      "title": "应急管理部危险化学品目录（2015版）实施指南官方摘要",
+      "jurisdiction": "CN",
+      "source_type": "official_catalog_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "hazardous_catalog_screening",
+      "source_url": "https://www.mem.gov.cn/gk/gwgg/agwzlfl/gfxwj/2015/201509/t20150902_242909.shtml",
+      "version": "危险化学品目录-2015-实施指南",
+      "effective_date": "2015-09-02",
+      "retrieved_at": "2026-05-09",
+      "license_note": "公开官方网页摘要，用于演示目录筛查，不替代官方目录原文和企业合规判断。"
+    },
+    {
+      "filename": "internal_compatibility_redline_rules.md",
+      "title": "企业化工物料准入内部禁忌与红线规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_policy",
+      "source_origin": "internal",
+      "quality_tier": "internal_controlled",
+      "document_role": "enterprise_rule_screening",
+      "source_url": "internal://chemical-compliance/policies/material-admission-redline",
+      "version": "internal-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "retrieved_at": "2026-05-09",
+      "license_note": "合成企业内部演示规则。生产环境应由企业 EHS、法规和业务负责人批准后导入。"
+    }
+  ]
+}

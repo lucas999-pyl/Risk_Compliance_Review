@@ -1,0 +1,155 @@
+{
+  "dataset_id": "chemical_rag_golden_v1",
+  "version": "2026-05-demo-expanded",
+  "created_for": "化工合规 RAG 工具 Demo",
+  "data_policy": {
+    "synthetic": true,
+    "note": "全部样本为合成数据，仅用于展示 SDS、配方表、工艺参数、规则证据、RAG 检索、多 Agent 和三值判定流程。"
+  },
+  "cases": [
+    {
+      "case_id": "chemical_compliant_formula",
+      "title": "水性清洗液配方合规预审",
+      "scenario_tags": ["SDS完整", "配方完整", "无禁忌组合"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/compliant_formula_sds.txt",
+      "formula_path": "documents/compliant_formula_formula.txt",
+      "process_path": "documents/compliant_formula_process.txt",
+      "expected_verdict": "合规",
+      "expected_review": false,
+      "expected_rules": ["sds_complete", "formula_components_known", "storage_compatible"]
+    },
+    {
+      "case_id": "chemical_incompatible_formula",
+      "title": "含乙醇与过氧化氢的清洗剂配方预审",
+      "scenario_tags": ["禁忌组合", "氧化剂", "可燃液体"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/incompatible_formula_sds.txt",
+      "formula_path": "documents/incompatible_formula_formula.txt",
+      "process_path": "documents/incompatible_formula_process.txt",
+      "expected_verdict": "不合规",
+      "expected_review": false,
+      "expected_rules": ["incompatibility_oxidizer_flammable", "hazardous_catalog_match"]
+    },
+    {
+      "case_id": "chemical_missing_sds_or_process",
+      "title": "资料缺失的反应助剂配方预审",
+      "scenario_tags": ["SDS缺章节", "工艺温压缺失", "需人工复核"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/missing_sds_or_process_sds.txt",
+      "formula_path": "documents/missing_sds_or_process_formula.txt",
+      "process_path": "documents/missing_sds_or_process_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["sds_missing_sections", "process_parameters_missing"]
+    },
+    {
+      "case_id": "chemical_unknown_substance",
+      "title": "未知 CAS 研发中间体配方预审",
+      "scenario_tags": ["未知CAS", "知识库无命中", "需人工复核"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/unknown_substance_sds.txt",
+      "formula_path": "documents/unknown_substance_formula.txt",
+      "process_path": "documents/unknown_substance_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["unknown_substance_review", "knowledge_no_match_review"]
+    },
+    {
+      "case_id": "chemical_bpa_svhc_review",
+      "title": "含双酚 A 环氧添加剂 REACH/SVHC 预审",
+      "scenario_tags": ["SVHC阈值", "EU", "需人工复核"],
+      "target_markets": ["EU", "CN"],
+      "sds_path": "documents/bpa_svhc_review_sds.txt",
+      "formula_path": "documents/bpa_svhc_review_formula.txt",
+      "process_path": "documents/bpa_svhc_review_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["svhc_threshold_match"]
+    },
+    {
+      "case_id": "chemical_acetone_storage_review",
+      "title": "丙酮清洗剂储存条件缺口预审",
+      "scenario_tags": ["可燃液体", "储存条件缺失", "需人工复核"],
+      "target_markets": ["CN", "US"],
+      "sds_path": "documents/acetone_storage_review_sds.txt",
+      "formula_path": "documents/acetone_storage_review_formula.txt",
+      "process_path": "documents/acetone_storage_review_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["flammable_storage_missing"]
+    },
+    {
+      "case_id": "chemical_hypochlorite_acid_incompatible",
+      "title": "次氯酸钠与盐酸酸化清洗方案预审",
+      "scenario_tags": ["酸碱/氧化禁忌", "可能释放氯气", "不合规"],
+      "target_markets": ["CN", "US"],
+      "sds_path": "documents/hypochlorite_acid_incompatible_sds.txt",
+      "formula_path": "documents/hypochlorite_acid_incompatible_formula.txt",
+      "process_path": "documents/hypochlorite_acid_incompatible_process.txt",
+      "expected_verdict": "不合规",
+      "expected_review": false,
+      "expected_rules": ["incompatibility_hypochlorite_acid"]
+    },
+    {
+      "case_id": "chemical_hydrogen_peroxide_heated_process",
+      "title": "过氧化氢高温工艺参数预审",
+      "scenario_tags": ["氧化剂", "高温工艺", "需人工复核"],
+      "target_markets": ["CN", "US"],
+      "sds_path": "documents/hydrogen_peroxide_heated_process_sds.txt",
+      "formula_path": "documents/hydrogen_peroxide_heated_process_formula.txt",
+      "process_path": "documents/hydrogen_peroxide_heated_process_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["oxidizer_high_temperature_process"]
+    },
+    {
+      "case_id": "chemical_confidential_formula_missing_cas",
+      "title": "保密配方缺 CAS 信息预审",
+      "scenario_tags": ["保密成分", "CAS缺失", "需人工复核"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/confidential_formula_missing_cas_sds.txt",
+      "formula_path": "documents/confidential_formula_missing_cas_formula.txt",
+      "process_path": "documents/confidential_formula_missing_cas_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["formula_components_missing"]
+    },
+    {
+      "case_id": "chemical_outdated_sds_revision",
+      "title": "SDS 修订日期过期预审",
+      "scenario_tags": ["SDS时效", "资料版本", "需人工复核"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/outdated_sds_revision_sds.txt",
+      "formula_path": "documents/outdated_sds_revision_formula.txt",
+      "process_path": "documents/outdated_sds_revision_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["sds_revision_outdated"]
+    },
+    {
+      "case_id": "chemical_transport_un_mismatch",
+      "title": "运输 UN 编号与物料类型不一致预审",
+      "scenario_tags": ["运输信息", "UN号不一致", "需人工复核"],
+      "target_markets": ["CN", "US"],
+      "sds_path": "documents/transport_un_mismatch_sds.txt",
+      "formula_path": "documents/transport_un_mismatch_formula.txt",
+      "process_path": "documents/transport_un_mismatch_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["transport_un_mismatch"]
+    },
+    {
+      "case_id": "chemical_internal_redline_benzene",
+      "title": "含苯溶剂企业红线预审",
+      "scenario_tags": ["企业红线", "苯", "不合规"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/internal_redline_benzene_sds.txt",
+      "formula_path": "documents/internal_redline_benzene_formula.txt",
+      "process_path": "documents/internal_redline_benzene_process.txt",
+      "expected_verdict": "不合规",
+      "expected_review": false,
+      "expected_rules": ["enterprise_redline_benzene"]
+    }
+  ]
+}

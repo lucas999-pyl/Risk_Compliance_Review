@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.pytest_local_tmp/
+.tmp_*/
+*.pyc
+data/
+.env
+.env.*
+!.env.example
+.vscode/
+node_modules/
+dist/
+build/

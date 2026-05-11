@@ -1,0 +1,77 @@
+{
+  "pack_id": "chemical_rules_pack",
+  "version": "2026-05-demo-expanded",
+  "synthetic": true,
+  "sources": [
+    {
+      "title": "企业物质禁忌矩阵演示规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_rule",
+      "source_url": "internal://chemical-rag/rules/incompatibility-matrix",
+      "version": "matrix-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "license_note": "合成演示规则，生产环境应替换为企业批准的 EHS 禁忌矩阵。",
+      "content": "规则 incompatibility_oxidizer_flammable：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1 属于可燃液体；过氧化氢 CAS 7722-84-1 属于氧化剂。配方、工艺或储运场景中若同时出现可燃液体与氧化剂并计划混配或同储，应判定为禁忌组合，不合规。规则 incompatibility_hypochlorite_acid：次氯酸钠 CAS 7681-52-9 与盐酸 CAS 7647-01-0 或其他酸类混合、同槽、同罐或同储时可能释放氯气，应判定为禁忌组合，不合规。规则 storage_compatible：水 CAS 7732-18-5 与氯化钠 CAS 7647-14-5 在本演示规则包中按一般液体兼容处理。"
+    },
+    {
+      "title": "企业内部化工准入红线演示规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_policy",
+      "source_url": "internal://chemical-rag/policies/redline",
+      "version": "redline-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "license_note": "合成演示规则，生产环境应由企业合规、EHS 和业务负责人批准。",
+      "content": "规则 unknown_substance_review：未知 CAS、未进入物质主数据或知识库无命中的物质不得自动放行，必须进入复核。规则 process_parameters_missing：配方合规预审必须具备关键工艺温度、压力和关键步骤；缺失时输出复核。规则 sds_missing_sections：SDS 不满足 16 章节结构时输出复核。规则 formula_components_missing：配方表或 SDS 未提供 CAS、浓度或等效保密成分合规声明时输出复核。规则 sds_revision_outdated：SDS 修订日期早于 2023-01-01 或无法证明版本有效时输出复核。规则 enterprise_redline_benzene：苯 CAS 71-43-2 在本演示企业红线中禁止作为新供应商物料准入，命中时输出不合规。"
+    },
+    {
+      "title": "企业储运兼容性演示规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_rule",
+      "source_url": "internal://chemical-rag/rules/storage-transport",
+      "version": "storage-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "license_note": "合成演示规则，生产环境应结合仓库分区、消防设计、运输分类和客户制度确认。",
+      "content": "规则 flammable_storage_missing：丙酮 CAS 67-64-1、乙醇 CAS 64-17-5、苯 CAS 71-43-2 等可燃液体如 SDS、配方表或工艺资料未提供明确储存条件、防火隔离、通风或防爆要求，应输出复核。规则 transport_un_mismatch：乙醇/可燃液体清洗液通常应与 UN 1170 或 UN 1993 等运输信息一致；如资料中出现 UN 3082 等与物料危险类别明显不一致的编号，应输出复核。"
+    },
+    {
+      "title": "企业氧化剂工艺安全演示规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_rule",
+      "source_url": "internal://chemical-rag/rules/oxidizer-process",
+      "version": "process-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "license_note": "合成演示规则，生产环境应结合 HAZOP、SOP 和装置设计确认。",
+      "content": "规则 oxidizer_high_temperature_process：过氧化氢 CAS 7722-84-1 等氧化剂若工艺温度达到或超过 60 C，或资料显示加热、热源、夹套升温、循环喷淋等高温操作，应输出复核，并要求 EHS 或工艺安全人员确认稳定性、分解风险和防护措施。"
+    },
+    {
+      "title": "中国危险化学品目录演示摘录",
+      "jurisdiction": "CN",
+      "source_type": "official_law_demo",
+      "source_url": "https://www.mem.gov.cn/gk/gwgg/agwzlfl/gfxwj/2015/201509/t20150902_242909.shtml",
+      "version": "2015-demo",
+      "effective_date": "2015-09-02",
+      "license_note": "基于公开目录说明的合成演示摘录，不包含法规原文全文。",
+      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2 在本演示包中按危险化学品目录命中信号处理。水 CAS 7732-18-5 与氯化钠 CAS 7647-14-5 在本演示包中不产生危险化学品目录命中。规则 hazardous_catalog_match：目录命中不等于直接不合规，但应结合用途、浓度、储运、许可和企业制度进行复核。"
+    },
+    {
+      "title": "ECHA REACH/SVHC 演示摘录",
+      "jurisdiction": "EU",
+      "source_type": "official_registry_demo",
+      "source_url": "https://www.echa.europa.eu/en/candidate-list-table",
+      "version": "2026-01-demo",
+      "effective_date": "2026-01-01",
+      "license_note": "合成演示摘录，生产环境应导入 ECHA 当前数据。",
+      "content": "演示筛查：双酚 A CAS 80-05-7 在本演示包中按 SVHC 命中信号处理，浓度达到或超过 0.1% w/w 时触发复核或风险提示。乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、水 CAS 7732-18-5、氯化钠 CAS 7647-14-5 在本演示摘录中不产生 SVHC 命中。规则 svhc_threshold_match：SVHC 命中需要法规人员结合用途、物品/混合物边界、客户市场和披露义务复核。"
+    },
+    {
+      "title": "EPA TSCA 与 OSHA HCS 演示摘录",
+      "jurisdiction": "US",
+      "source_type": "official_registry_demo",
+      "source_url": "https://www.epa.gov/tsca-inventory",
+      "version": "2026-01-demo",
+      "effective_date": "2026-01-01",
+      "license_note": "合成演示摘录，生产环境应导入授权 EPA/OSHA 数据。",
+      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2、水 CAS 7732-18-5、氯化钠 CAS 7647-14-5 在本演示 TSCA 摘录中按已知物质处理。未知 CAS 123456-78-9 无清单命中，应进入复核。OSHA HCS 2024 演示规则要求 SDS/GHS 分类资料完整。规则 tsca_inventory_match：TSCA 命中仅表示演示清单可识别，不替代最终合规判断。"
+    }
+  ]
+}
