@@ -105,6 +105,124 @@ REVIEW_RULES = {
     "sds_revision_outdated",
     "transport_un_mismatch",
 }
+CHECK_TYPE_LABELS = {
+    "intake_readiness": "资料完整性与可审性",
+    "ingredient_identity": "成分识别与 CAS/浓度完整性",
+    "restricted_substance": "禁限用物质与红线物质筛查",
+    "compatibility_risk": "物料相容性与危险组合",
+    "sds_key_sections": "SDS 关键章节核查",
+    "process_fit": "工艺条件适配性",
+    "storage_transport": "储存与运输条件核查",
+    "regulatory_screening": "目标市场法规匹配",
+    "supplier_evidence_consistency": "供应商声明/检测报告一致性",
+    "manual_review": "人工复核与补件建议",
+}
+LEGACY_CHECK_TYPE_MAP = {
+    "document_completeness": ["intake_readiness"],
+    "material": ["ingredient_identity", "restricted_substance", "compatibility_risk"],
+    "process": ["process_fit"],
+    "storage": ["storage_transport"],
+    "regulatory": ["regulatory_screening"],
+}
+CHECK_TYPE_AGENTS = {
+    "intake_readiness": "资料完整性",
+    "ingredient_identity": "物料",
+    "restricted_substance": "法规",
+    "compatibility_risk": "储运",
+    "sds_key_sections": "资料完整性",
+    "process_fit": "工艺",
+    "storage_transport": "储运",
+    "regulatory_screening": "法规",
+    "supplier_evidence_consistency": "资料完整性",
+    "manual_review": "资料完整性",
+}
+AGENT_CHECK_TYPES = {agent: check_type for check_type, agent in CHECK_TYPE_AGENTS.items()}
+REVIEW_SCENARIO_LABELS = {
+    "market_access": "市场准入预审",
+    "substitution": "替代物料评估",
+    "supplier_intake": "供应商资料准入",
+    "process_introduction": "工艺导入风险评估",
+    "storage_safety": "储运与现场安全评估",
+}
+SCENARIO_RECOMMENDED_CHECK_TYPES = {
+    "supplier_intake": (
+        "intake_readiness",
+        "ingredient_identity",
+        "restricted_substance",
+        "sds_key_sections",
+        "supplier_evidence_consistency",
+        "manual_review",
+    ),
+    "substitution": (
+        "intake_readiness",
+        "ingredient_identity",
+        "restricted_substance",
+        "compatibility_risk",
+        "process_fit",
+        "storage_transport",
+        "manual_review",
+    ),
+    "market_access": (
+        "intake_readiness",
+        "ingredient_identity",
+        "restricted_substance",
+        "sds_key_sections",
+        "process_fit",
+        "storage_transport",
+        "regulatory_screening",
+    ),
+    "process_introduction": (
+        "intake_readiness",
+        "ingredient_identity",
+        "compatibility_risk",
+        "process_fit",
+        "storage_transport",
+        "manual_review",
+    ),
+    "storage_safety": (
+        "intake_readiness",
+        "ingredient_identity",
+        "compatibility_risk",
+        "storage_transport",
+        "sds_key_sections",
+        "manual_review",
+    ),
+}
+DEFAULT_CHECK_TYPES = SCENARIO_RECOMMENDED_CHECK_TYPES["market_access"]
+DOCUMENT_TYPE_LABELS = {
+    "sds": "SDS 安全技术说明书",
+    "formula": "配方/成分表",
+    "process": "工艺说明",
+    "storage_transport": "储运资料",
+    "regulatory_certificate": "法规/供应商声明",
+    "test_report": "检测报告",
+    "unknown": "未识别资料",
+}
+CORE_DOCUMENT_TYPES = ("sds", "formula", "process")
+CUSTOMER_FIELD_LABELS = {
+    "sds_sections": "SDS 16 章节",
+    "supplier": "供应商名称",
+    "revision_date": "SDS 修订日期",
+    "cas_numbers": "成分 CAS 号",
+    "component_concentrations": "成分浓度",
+    "process_temperature": "工艺温度",
+    "process_pressure": "工艺压力",
+    "process_steps": "工艺关键步骤",
+    "storage_condition": "储存条件",
+    "transport_information": "运输信息",
+    "supplier_declaration": "供应商声明",
+    "test_report": "检测报告",
+    "machine_readable_text": "可复制文字版资料",
+}
+EMPTY_UPLOADED_DOCUMENT: dict[str, Any] = {
+    "filename": "",
+    "path": "",
+    "content": "",
+    "content_type": "text/plain",
+    "text_source": "missing",
+    "parse_status": "needs_manual_review",
+    "sha256": "",
+}
 
 
 @dataclass(frozen=True)
@@ -187,19 +305,37 @@ class ChemicalRagRunner:
         self,
         *,
         title: str,
+        case_id: str | None = None,
         review_task: str | None = None,
+        review_scenario: str = "market_access",
+        check_types: list[str] | None = None,
         target_markets: list[str],
         top_k: int,
         sds: dict[str, Any],
         formula: dict[str, Any],
         process: dict[str, Any],
+        package_precheck: dict[str, Any] | None = None,
         use_llm: bool = True,
     ) -> dict[str, Any]:
-        case_id = new_id("upload")
+        case_id = case_id or new_id("upload")
+        normalized_scenario = self._normalize_review_scenario(review_scenario)
+        normalized_checks = self._normalize_check_types(check_types, normalized_scenario)
+        package_precheck = package_precheck or self.build_package_precheck(
+            [
+                {**sds, "document_type": "sds"},
+                {**formula, "document_type": "formula"},
+                {**process, "document_type": "process"},
+            ],
+            review_scenario=normalized_scenario,
+            check_types=normalized_checks,
+        )
         case = {
             "case_id": case_id,
             "title": title,
             "review_task": (review_task or DEFAULT_REVIEW_TASK).strip() or DEFAULT_REVIEW_TASK,
+            "review_scenario": normalized_scenario,
+            "check_types": normalized_checks,
+            "package_precheck": package_precheck,
             "scenario_tags": ["现场上传", "非预设案例"],
             "target_markets": target_markets,
             "sds_path": sds["filename"],
@@ -226,6 +362,59 @@ class ChemicalRagRunner:
             self._parsed_document_payload("formula", formula),
             self._parsed_document_payload("process", process),
         ]
+        trace["package_precheck"] = package_precheck
+        trace["customer_report"] = trace["review_workbench"]["customer_report"]
+        return trace
+
+    def run_uploaded_document_package(
+        self,
+        *,
+        title: str,
+        case_id: str | None = None,
+        review_task: str | None = None,
+        review_scenario: str = "market_access",
+        check_types: list[str] | None = None,
+        target_markets: list[str],
+        top_k: int,
+        documents: list[dict[str, Any]],
+        use_llm: bool = True,
+    ) -> dict[str, Any]:
+        package = self._classify_uploaded_package(documents)
+        normalized_scenario = self._normalize_review_scenario(review_scenario)
+        normalized_checks = self._normalize_check_types(check_types, normalized_scenario)
+        package_precheck = self.build_package_precheck(
+            package["original_documents"],
+            review_scenario=normalized_scenario,
+            check_types=normalized_checks,
+        )
+        trace = self.run_uploaded_documents(
+            title=title,
+            case_id=case_id,
+            review_task=review_task,
+            review_scenario=normalized_scenario,
+            check_types=normalized_checks,
+            target_markets=target_markets,
+            top_k=top_k,
+            sds=package["sds"],
+            formula=package["formula"],
+            process=package["process"],
+            package_precheck=package_precheck,
+            use_llm=use_llm,
+        )
+        trace["uploaded_documents"] = [
+            self._uploaded_document_payload(item["document_type"], item)
+            for item in package["original_documents"]
+        ]
+        trace["parsed_documents"] = [
+            self._parsed_document_payload(item["document_type"], item)
+            for item in package["original_documents"]
+        ]
+        trace["document_classification"] = {
+            item["filename"]: item["document_type"]
+            for item in package["original_documents"]
+            if item.get("filename")
+        }
+        trace["_classified_documents"] = package["original_documents"]
         return trace
 
     def uploaded_document_from_bytes(
@@ -271,6 +460,8 @@ class ChemicalRagRunner:
         knowledge_pack = self._knowledge_pack_payload()
         review_task = str(case.get("review_task") or DEFAULT_REVIEW_TASK).strip() or DEFAULT_REVIEW_TASK
         case["review_task"] = review_task
+        case["review_scenario"] = self._normalize_review_scenario(str(case.get("review_scenario") or "market_access"))
+        case["check_types"] = self._normalize_check_types(case.get("check_types"), case["review_scenario"])
         query = self._build_query(case, components, process)
         task_decomposition = self._decompose_review_task(review_task, case, parsed_sds, formula, components, process)
         rag_queries = self._build_rag_queries(task_decomposition, case, components, process)
@@ -335,6 +526,8 @@ class ChemicalRagRunner:
         chief_synthesis = self._chief_synthesis(chief, agent_branches, rule_hits, review_task)
         evidences = self._build_evidences(case, parsed_sds, formula, process, retrieved, rule_hits, case_source=case_source)
         evaluation = self._evaluate_case(case, chief, evidences, retrieved) if include_evaluation else None
+        run_id = new_id("chemrun")
+        generated_at = utc_now()
         review_workbench = self._build_review_workbench(
             case=case,
             sds_text=sds_text,
@@ -353,6 +546,8 @@ class ChemicalRagRunner:
             agent_branches=agent_branches,
             chief_synthesis=chief_synthesis,
             knowledge_pack=knowledge_pack,
+            run_id=run_id,
+            generated_at=generated_at,
         )
         nodes = self._nodes(
             case=case,
@@ -375,12 +570,15 @@ class ChemicalRagRunner:
         findings = self._compat_findings(case, chief, rule_hits, evidences)
 
         payload = {
-            "run_id": new_id("chemrun"),
+            "run_id": run_id,
             "case_id": case["case_id"],
+            "case_title": case["title"],
             "case_source": case_source,
             "review_task": review_task,
+            "review_scenario": case["review_scenario"],
+            "check_types": case["check_types"],
             "knowledge_pack": knowledge_pack,
-            "generated_at": utc_now(),
+            "generated_at": generated_at,
             "graph": {
                 "name": "chemical_compliance_rag_v1",
                 "engine": "langgraph" if self._langgraph_available() else "deterministic_state_graph",
@@ -427,8 +625,21 @@ class ChemicalRagRunner:
                 "chunks": [self._chunk_payload(item) for item in retrieved],
             },
             "rule_hits": rule_hits,
+            "package_precheck": case.get("package_precheck"),
             "findings": findings,
             "review_workbench": review_workbench,
+            "customer_report": review_workbench["customer_report"],
+            "technical_trace": {
+                "task_decomposition": task_decomposition,
+                "rag_queries": rag_queries,
+                "agent_branches": agent_branches,
+                "chief_synthesis": chief_synthesis,
+                "retrieval": {
+                    "queries": list(rag_queries.values()),
+                    "chunk_count": len(retrieved),
+                },
+                "trace_node_count": len(nodes),
+            },
             "replay": {
                 "checkpoint_count": len(nodes),
                 "checkpoints": [
@@ -821,6 +1032,318 @@ class ChemicalRagRunner:
                 return case
         raise KeyError(case_id)
 
+    def _normalize_review_scenario(self, review_scenario: str | None) -> str:
+        value = (review_scenario or "market_access").strip()
+        return value if value in REVIEW_SCENARIO_LABELS else "market_access"
+
+    def _default_check_types_for_scenario(self, review_scenario: str | None) -> list[str]:
+        scenario = self._normalize_review_scenario(review_scenario)
+        return list(SCENARIO_RECOMMENDED_CHECK_TYPES.get(scenario, DEFAULT_CHECK_TYPES))
+
+    def _normalize_check_types(self, check_types: object | None, review_scenario: str | None = None) -> list[str]:
+        if check_types is None:
+            return self._default_check_types_for_scenario(review_scenario)
+        if isinstance(check_types, str):
+            raw_items = re.split(r"[,，;\s]+", check_types)
+        else:
+            raw_items = [str(item) for item in check_types if str(item).strip()]
+        normalized = []
+        for item in raw_items:
+            value = item.strip()
+            mapped_values = LEGACY_CHECK_TYPE_MAP.get(value, [value])
+            for mapped in mapped_values:
+                if mapped in CHECK_TYPE_LABELS and mapped not in normalized:
+                    normalized.append(mapped)
+        return normalized or self._default_check_types_for_scenario(review_scenario)
+
+    def _classify_uploaded_package(self, documents: list[dict[str, Any]]) -> dict[str, Any]:
+        slots = {
+            "sds": self._missing_document("sds"),
+            "formula": self._missing_document("formula"),
+            "process": self._missing_document("process"),
+        }
+        original_documents = []
+        for document in documents:
+            document_type = self._classify_uploaded_document(document)
+            typed_document = {**document, "document_type": document_type}
+            original_documents.append(typed_document)
+            if document_type in slots and slots[document_type].get("text_source") == "missing":
+                slots[document_type] = typed_document
+        return {**slots, "original_documents": original_documents}
+
+    def _missing_document(self, document_type: str) -> dict[str, Any]:
+        return {**EMPTY_UPLOADED_DOCUMENT, "filename": f"missing_{document_type}.txt", "path": f"missing_{document_type}.txt", "document_type": document_type}
+
+    def _classify_uploaded_document(self, document: dict[str, Any]) -> str:
+        filename = document.get("filename", "").lower()
+        text = document.get("content", "")
+        parsed = document.get("parsed_document")
+        lowered_text = text.lower()
+        if document.get("text_source") == "pdf_unreadable":
+            return "unknown"
+        if filename.endswith("_sds.txt") or filename.endswith("-sds.txt") or "sds" in filename or "安全技术说明书" in text or "safety data sheet" in lowered_text:
+            return "sds"
+        if filename.endswith("_formula.txt") or filename.endswith("-formula.txt") or "formula" in filename or "配方" in filename or "成分表" in text or "ingredient" in lowered_text:
+            return "formula"
+        if filename.endswith("_process.txt") or filename.endswith("-process.txt") or "process" in filename or "工艺" in filename:
+            return "process"
+        if any(keyword in filename for keyword in ["storage", "transport", "shipping"]) or any(keyword in text for keyword in ["储存条件", "运输信息", "储运"]):
+            return "storage_transport"
+        if any(keyword in filename for keyword in ["certificate", "declaration", "compliance", "声明", "合规"]) or any(keyword in text for keyword in ["符合性声明", "供应商声明", "REACH", "RoHS", "TSCA"]):
+            return "regulatory_certificate"
+        if any(keyword in filename for keyword in ["report", "test", "检测", "测试"]) or any(keyword in text for keyword in ["检测报告", "测试报告", "检验报告"]):
+            return "test_report"
+        if "formula" in filename or "配方" in filename or self._parse_formula(text)["component_count"] > 0:
+            return "formula"
+        if "process" in filename or "工艺" in filename or self._parse_process(text)["fields"]:
+            return "process"
+        if parsed is not None and len(parsed.sections) >= 4:
+            return "sds"
+        return "unknown"
+
+    def build_package_precheck(
+        self,
+        documents: list[dict[str, Any]],
+        *,
+        review_scenario: str = "market_access",
+        check_types: list[str] | None = None,
+    ) -> dict[str, Any]:
+        selected_checks = self._normalize_check_types(check_types, review_scenario)
+        typed_documents = [
+            document if document.get("document_type") else {**document, "document_type": self._classify_uploaded_document(document)}
+            for document in documents
+            if document.get("text_source") != "missing"
+        ]
+        document_items = [self._precheck_document_item(document) for document in typed_documents]
+        coverage_types = {item["detected_type"] for item in document_items}
+        recognized_types = {item["detected_type"] for item in document_items if item["detected_type"] != "unknown"}
+        missing_documents = [doc_type for doc_type in CORE_DOCUMENT_TYPES if doc_type not in recognized_types]
+        supplement_actions = self._package_supplement_actions(document_items, missing_documents, selected_checks)
+        coverage = self._check_coverage(coverage_types, selected_checks)
+        if document_items and all(item["readability"] == "unreadable" for item in document_items):
+            overall_status = "unreadable"
+        elif not document_items or "sds" not in recognized_types or "formula" not in recognized_types:
+            overall_status = "needs_supplement"
+        elif missing_documents or coverage["limited_checks"] or coverage["blocked_checks"]:
+            overall_status = "partial"
+        else:
+            overall_status = "ready"
+        return {
+            "overall_status": overall_status,
+            "review_scenario": {
+                "id": self._normalize_review_scenario(review_scenario),
+                "label": REVIEW_SCENARIO_LABELS[self._normalize_review_scenario(review_scenario)],
+            },
+            "selected_checks": [{"id": item, "label": CHECK_TYPE_LABELS[item]} for item in selected_checks],
+            "documents": document_items,
+            "recognized_documents": [
+                {
+                    "type": doc_type,
+                    "label": DOCUMENT_TYPE_LABELS.get(doc_type, doc_type),
+                    "count": sum(1 for item in document_items if item["detected_type"] == doc_type),
+                }
+                for doc_type in sorted(recognized_types)
+            ],
+            "missing_documents": missing_documents,
+            "available_checks": coverage["available_checks"],
+            "limited_checks": coverage["limited_checks"],
+            "blocked_checks": coverage["blocked_checks"],
+            "supplement_actions": supplement_actions,
+            "user_message": self._package_precheck_message(overall_status, recognized_types, missing_documents),
+        }
+
+    def _precheck_document_item(self, document: dict[str, Any]) -> dict[str, Any]:
+        document_type = document.get("document_type") or self._classify_uploaded_document(document)
+        text = document.get("content", "")
+        parsed = document.get("parsed_document")
+        if parsed is None:
+            parsed = parse_document_text(text)
+        readability = self._document_readability(document, parsed)
+        recognized_fields = self._recognized_precheck_fields(document_type, text, parsed)
+        missing_fields = self._missing_precheck_fields(document_type, recognized_fields, readability)
+        confidence = self._document_type_confidence(document_type, recognized_fields, readability)
+        return {
+            "filename": document.get("filename", "document"),
+            "detected_type": document_type,
+            "detected_type_label": DOCUMENT_TYPE_LABELS.get(document_type, document_type),
+            "readability": readability,
+            "confidence": confidence,
+            "recognized_fields": recognized_fields,
+            "missing_fields": missing_fields,
+            "user_message": self._document_precheck_message(document_type, readability, recognized_fields, missing_fields),
+        }
+
+    def _document_readability(self, document: dict[str, Any], parsed: Any) -> str:
+        if document.get("text_source") == "pdf_unreadable" or getattr(parsed, "text_source", "") == "pdf_unreadable":
+            return "unreadable"
+        text_length = len(str(document.get("content") or "").strip())
+        if text_length < 20:
+            return "partially_readable"
+        if getattr(parsed, "parse_status", "parsed") == "parse_failed":
+            return "unreadable"
+        return "readable"
+
+    def _recognized_precheck_fields(self, document_type: str, text: str, parsed: Any) -> list[str]:
+        fields: list[str] = []
+        extracted = getattr(parsed, "extracted_fields", {}) or {}
+        metadata = getattr(parsed, "metadata", {}) or {}
+        if extracted.get("supplier"):
+            fields.append("supplier")
+        if extracted.get("revision_date"):
+            fields.append("revision_date")
+        if metadata.get("sds_section_numbers"):
+            fields.append("sds_sections")
+        if metadata.get("cas_numbers"):
+            fields.append("cas_numbers")
+        if getattr(parsed, "components", []):
+            fields.append("component_concentrations")
+        formula = self._parse_formula(text)
+        if formula["component_count"] > 0 and "cas_numbers" not in fields:
+            fields.append("cas_numbers")
+        if formula["component_count"] > 0 and "component_concentrations" not in fields:
+            fields.append("component_concentrations")
+        process = self._parse_process(text)
+        process_field_map = {
+            "温度": "process_temperature",
+            "压力": "process_pressure",
+            "关键步骤": "process_steps",
+            "储存条件": "storage_condition",
+            "储存类别": "storage_condition",
+            "运输信息": "transport_information",
+        }
+        for key, field in process_field_map.items():
+            if process["fields"].get(key) and field not in fields:
+                fields.append(field)
+        if any(keyword in text for keyword in ["符合性声明", "供应商声明", "REACH", "RoHS", "TSCA"]) and "supplier_declaration" not in fields:
+            fields.append("supplier_declaration")
+        if any(keyword in text for keyword in ["检测报告", "测试报告", "检验报告"]) and "test_report" not in fields:
+            fields.append("test_report")
+        if document_type == "sds" and "sds_sections" not in fields and len(getattr(parsed, "sections", [])) >= 4:
+            fields.append("sds_sections")
+        return fields
+
+    def _missing_precheck_fields(self, document_type: str, recognized_fields: list[str], readability: str) -> list[str]:
+        if readability == "unreadable":
+            return ["machine_readable_text"]
+        required = {
+            "sds": ["sds_sections", "supplier", "revision_date", "cas_numbers"],
+            "formula": ["cas_numbers", "component_concentrations"],
+            "process": ["process_temperature", "process_pressure", "process_steps"],
+            "storage_transport": ["storage_condition", "transport_information"],
+            "regulatory_certificate": ["supplier_declaration"],
+            "test_report": ["test_report"],
+            "unknown": [],
+        }
+        return [field for field in required.get(document_type, []) if field not in recognized_fields]
+
+    def _document_type_confidence(self, document_type: str, recognized_fields: list[str], readability: str) -> str:
+        if readability == "unreadable" or document_type == "unknown":
+            return "low"
+        if len(recognized_fields) >= 3:
+            return "high"
+        return "medium"
+
+    def _document_precheck_message(
+        self,
+        document_type: str,
+        readability: str,
+        recognized_fields: list[str],
+        missing_fields: list[str],
+    ) -> str:
+        if readability == "unreadable":
+            return "文件无法抽取机器可读文本，请补充可复制文字版 PDF、Word 转文本或原始文本资料。"
+        if document_type == "unknown":
+            return "系统未能判断该文件属于 SDS、配方、工艺、储运、声明或检测报告，已作为参考资料保留。"
+        if missing_fields:
+            return f"已识别为{DOCUMENT_TYPE_LABELS.get(document_type, document_type)}，但仍缺少：{'、'.join(self._customer_field_label(item) for item in missing_fields)}。"
+        return f"已识别为{DOCUMENT_TYPE_LABELS.get(document_type, document_type)}，可支撑相关预审。"
+
+    def _check_coverage(self, recognized_types: set[str], selected_checks: list[str]) -> dict[str, list[dict[str, str]]]:
+        required_by_check = {
+            "intake_readiness": set(),
+            "ingredient_identity": {"sds", "formula"},
+            "restricted_substance": {"sds", "formula"},
+            "compatibility_risk": {"formula"},
+            "sds_key_sections": {"sds"},
+            "process_fit": {"process"},
+            "storage_transport": {"sds", "storage_transport"},
+            "regulatory_screening": {"sds", "formula"},
+            "supplier_evidence_consistency": {"regulatory_certificate", "test_report"},
+            "manual_review": set(),
+        }
+        fallback_by_check = {
+            "ingredient_identity": {"unknown", "sds", "formula"},
+            "restricted_substance": {"unknown", "sds", "formula"},
+            "regulatory_screening": {"unknown", "sds", "formula"},
+            "storage_transport": {"sds", "process"},
+            "supplier_evidence_consistency": {"sds", "formula", "regulatory_certificate", "test_report"},
+        }
+        available: list[dict[str, str]] = []
+        limited: list[dict[str, str]] = []
+        blocked: list[dict[str, str]] = []
+        for check_id in selected_checks:
+            required = required_by_check.get(check_id, set())
+            fallback = fallback_by_check.get(check_id, required)
+            item = {"id": check_id, "label": CHECK_TYPE_LABELS[check_id]}
+            if not required or required.issubset(recognized_types):
+                available.append({**item, "reason": "资料可支撑该检查项。"})
+            elif fallback & recognized_types:
+                missing = sorted(required - recognized_types)
+                limited.append({**item, "reason": f"缺少 {'、'.join(DOCUMENT_TYPE_LABELS.get(doc_type, doc_type) for doc_type in missing)}，结果只能作为初筛或复核依据。"})
+            else:
+                missing = sorted(required - recognized_types)
+                blocked.append({**item, "reason": f"缺少 {'、'.join(DOCUMENT_TYPE_LABELS.get(doc_type, doc_type) for doc_type in missing)}，当前不能形成可靠判断。"})
+        return {"available_checks": available, "limited_checks": limited, "blocked_checks": blocked}
+
+    def _package_supplement_actions(
+        self,
+        document_items: list[dict[str, Any]],
+        missing_documents: list[str],
+        selected_checks: list[str],
+    ) -> list[dict[str, Any]]:
+        actions: list[dict[str, Any]] = []
+        for item in document_items:
+            if item["readability"] == "unreadable":
+                actions.append(
+                    {
+                        "field": "machine_readable_text",
+                        "action": f"补充 {item['filename']} 的可复制文字版或原始电子文档",
+                        "reason": "当前文件无法抽取文本，系统不能识别资料类型和关键字段。",
+                        "required_before_release": True,
+                    }
+                )
+        for doc_type in missing_documents:
+            actions.append(
+                {
+                    "field": f"missing_{doc_type}",
+                    "action": f"补充{DOCUMENT_TYPE_LABELS[doc_type]}",
+                    "reason": "缺少该资料会影响所选检查项的可靠性。",
+                    "required_before_release": doc_type in {"sds", "formula"},
+                }
+            )
+        for item in document_items:
+            for field in item.get("missing_fields", []):
+                if field == "machine_readable_text":
+                    continue
+                actions.append(
+                    {
+                        "field": field,
+                        "action": f"补充或确认 {item['filename']} 中的 {self._customer_field_label(field)}",
+                        "reason": "关键字段缺失会导致相关检查项只能复核或补件。",
+                        "required_before_release": field in {"cas_numbers", "component_concentrations", "sds_sections"},
+                    }
+                )
+        return list({(item["field"], item["action"]): item for item in actions}.values())[:10]
+
+    def _package_precheck_message(self, overall_status: str, recognized_types: set[str], missing_documents: list[str]) -> str:
+        if overall_status == "unreadable":
+            return "资料包中的文件无法抽取机器可读文本，请先补充可读版本。"
+        recognized = "、".join(DOCUMENT_TYPE_LABELS.get(item, item) for item in sorted(recognized_types)) or "未识别到核心资料"
+        if overall_status == "ready":
+            return f"系统已识别 {recognized}，资料包可支撑所选预审。"
+        missing = "、".join(DOCUMENT_TYPE_LABELS.get(item, item) for item in missing_documents) or "部分关键字段"
+        return f"系统已识别 {recognized}，但仍缺少 {missing}；可继续初筛，最终结论需补件或复核。"
+
     def _read_case_file(self, relative_path: str | None) -> str:
         if not relative_path:
             return ""
@@ -911,6 +1434,8 @@ class ChemicalRagRunner:
         terms = [
             case["title"],
             case.get("review_task", DEFAULT_REVIEW_TASK),
+            REVIEW_SCENARIO_LABELS.get(case.get("review_scenario", ""), ""),
+            " ".join(CHECK_TYPE_LABELS.get(item, item) for item in case.get("check_types", DEFAULT_CHECK_TYPES)),
             "SDS formula process storage compatibility chemical compliance RAG",
             "incompatibility oxidizer flammable hypochlorite acid benzene unknown substance review TSCA SVHC hazardous catalog storage transport UN revision",
             " ".join(case["target_markets"]),
@@ -934,7 +1459,7 @@ class ChemicalRagRunner:
         target_markets = "、".join(case.get("target_markets", []))
         missing_sds = "、".join(parsed_sds.missing_fields) if parsed_sds.missing_fields else "无"
         missing_process = "、".join(process.get("missing_fields", [])) if process.get("missing_fields") else "无"
-        return [
+        tasks = [
             {
                 "agent": "资料完整性",
                 "task_id": "document_completeness",
@@ -971,6 +1496,8 @@ class ChemicalRagRunner:
                 "inputs": f"目标市场：{target_markets}；{component_summary}。",
             },
         ]
+        selected_agents = {CHECK_TYPE_AGENTS[item] for item in self._normalize_check_types(case.get("check_types"), case.get("review_scenario"))}
+        return [task for task in tasks if task["agent"] in selected_agents]
 
     def _build_rag_queries(
         self,
@@ -1713,6 +2240,8 @@ class ChemicalRagRunner:
         agent_branches: dict[str, dict[str, Any]] | None = None,
         chief_synthesis: dict[str, Any] | None = None,
         knowledge_pack: dict[str, Any] | None = None,
+        run_id: str | None = None,
+        generated_at: str | None = None,
     ) -> dict[str, Any]:
         documents = documents or {}
         review_task = review_task or case.get("review_task") or DEFAULT_REVIEW_TASK
@@ -1760,8 +2289,23 @@ class ChemicalRagRunner:
             for evidence in evidences
         ]
         report_summary = self._review_report_summary(case, chief, checklist, risk_items, evidence_chain)
+        supplement_actions = self._supplement_actions(document_quality)
+        package_precheck = case.get("package_precheck")
+        customer_report = self._build_customer_report(
+            case=case,
+            chief=chief,
+            document_quality=document_quality,
+            supplement_actions=supplement_actions,
+            risk_items=risk_items,
+            evidence_chain=evidence_chain,
+            package_precheck=package_precheck,
+            run_id=run_id,
+            generated_at=generated_at,
+        )
         return {
             "review_task": review_task,
+            "review_scenario": case.get("review_scenario", "market_access"),
+            "check_types": self._normalize_check_types(case.get("check_types"), case.get("review_scenario")),
             "knowledge_pack": knowledge_pack or {},
             "task_decomposition": task_decomposition,
             "agent_branch_summary": [
@@ -1777,12 +2321,14 @@ class ChemicalRagRunner:
             ],
             "chief_review_summary": chief_synthesis,
             "source_documents": source_documents,
+            "package_precheck": package_precheck,
             "extracted_checklist": checklist,
             "document_quality": document_quality,
-            "supplement_actions": self._supplement_actions(document_quality),
+            "supplement_actions": supplement_actions,
             "risk_items": risk_items,
             "evidence_chain": evidence_chain,
             "report_summary": report_summary,
+            "customer_report": customer_report,
         }
 
     def _document_quality(self, checklist: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1844,6 +2390,420 @@ class ChemicalRagRunner:
             "storage_condition": "储存条件缺失，无法判断禁忌物隔离、防火、防爆和通风要求。",
         }
         return impacts.get(field, "资料字段缺失，需人工确认后再形成最终意见。")
+
+    def _customer_field_label(self, field: str) -> str:
+        if field.startswith("missing_"):
+            doc_type = field.removeprefix("missing_")
+            return DOCUMENT_TYPE_LABELS.get(doc_type, doc_type)
+        return CUSTOMER_FIELD_LABELS.get(field, field.replace("_", " "))
+
+    def _customer_action_text(self, action: dict[str, Any]) -> str:
+        field = self._customer_field_label(str(action.get("field", "")))
+        text = str(action.get("action", "")).strip()
+        if text.startswith("补充或确认"):
+            return f"请供应商补充或确认：{field}"
+        if text.startswith("补充"):
+            return text
+        return text or f"请补充或确认：{field}"
+
+    def _build_customer_report(
+        self,
+        *,
+        case: dict[str, Any],
+        chief: dict[str, Any],
+        document_quality: dict[str, Any],
+        supplement_actions: list[dict[str, Any]],
+        risk_items: list[dict[str, Any]],
+        evidence_chain: list[dict[str, Any]],
+        package_precheck: dict[str, Any] | None = None,
+        run_id: str | None = None,
+        generated_at: str | None = None,
+    ) -> dict[str, Any]:
+        check_types = self._normalize_check_types(case.get("check_types"), case.get("review_scenario"))
+        package_supplement_actions = package_precheck.get("supplement_actions", []) if package_precheck else []
+        combined_supplement_actions = self._dedupe_supplement_actions([*package_supplement_actions, *supplement_actions])
+        customer_verdict = self._customer_verdict(chief["verdict"], document_quality, package_precheck)
+        grouped: dict[str, list[dict[str, Any]]] = {check_type: [] for check_type in check_types}
+        seen: set[tuple[str, str, str]] = set()
+        counter = 1
+        if "intake_readiness" in grouped:
+            for gap in document_quality.get("blocking_gaps", []):
+                key = ("intake_readiness", "document_completeness_precheck", gap["field"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                action = next((item for item in combined_supplement_actions if item["field"] == gap["field"]), None)
+                grouped["intake_readiness"].append(
+                    {
+                        "id": f"I-{counter:03d}",
+                        "issue_id": f"I-{counter:03d}",
+                        "status": "needs_supplement",
+                        "status_label": self._customer_status_label("needs_supplement"),
+                        "severity": "blocking",
+                        "category": "intake_readiness",
+                        "category_label": CHECK_TYPE_LABELS["intake_readiness"],
+                        "reason": f"{gap['label']}缺失或无法确认。",
+                        "rule_id": "document_completeness_precheck",
+                        "rule_text": f"资料预检要求提供可支撑审查的{gap['label']}，否则不能直接形成准入结论。",
+                        "rule": {
+                            "id": "document_completeness_precheck",
+                            "text": f"资料预检要求提供可支撑审查的{gap['label']}，否则不能直接形成准入结论。",
+                            "source": "资料完整性预检",
+                        },
+                        "user_text": gap.get("evidence") or "用户资料未提供该字段。",
+                        "source": {
+                            "type": "uploaded_package",
+                            "text": gap.get("evidence") or "用户资料未提供该字段。",
+                            "document_type": gap.get("source", "资料包"),
+                        },
+                        "impact": gap["impact"],
+                        "recommendation": self._customer_action_text(action) if action else f"请供应商补充或确认：{gap['label']}",
+                        "requires_human_review": True,
+                    }
+                )
+                counter += 1
+        if package_precheck and "intake_readiness" in grouped:
+            for action in package_precheck.get("supplement_actions", []):
+                key = ("intake_readiness", "package_precheck", action["field"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                grouped["intake_readiness"].append(
+                    {
+                        "id": f"I-{counter:03d}",
+                        "issue_id": f"I-{counter:03d}",
+                        "status": "needs_supplement",
+                        "status_label": self._customer_status_label("needs_supplement"),
+                        "severity": "blocking",
+                        "category": "intake_readiness",
+                        "category_label": CHECK_TYPE_LABELS["intake_readiness"],
+                        "reason": self._customer_action_text(action),
+                        "rule_id": "package_precheck",
+                        "rule_text": "资料包预检要求先确认文件可读、资料类型清楚，并补齐支撑所选检查项的关键资料。",
+                        "rule": {
+                            "id": "package_precheck",
+                            "text": "资料包预检要求先确认文件可读、资料类型清楚，并补齐支撑所选检查项的关键资料。",
+                            "source": "资料包预检",
+                        },
+                        "user_text": action.get("reason", "资料包预检识别到资料缺口。"),
+                        "source": {
+                            "type": "package_precheck",
+                            "text": action.get("reason", "资料包预检识别到资料缺口。"),
+                            "document_type": action.get("field", "资料包"),
+                        },
+                        "impact": action.get("reason", "该缺口会影响审查可靠性。"),
+                        "recommendation": self._customer_action_text(action),
+                        "requires_human_review": True,
+                    }
+                )
+                counter += 1
+        for item in risk_items:
+            if item["verdict"] == "合规":
+                continue
+            check_type = self._check_type_for_risk_item(item)
+            if check_type not in grouped:
+                continue
+            rule_id = item["rule_refs"][0] if item.get("rule_refs") else "manual_review"
+            if self._is_positive_rule(rule_id):
+                continue
+            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
+            key = (check_type, rule_id, user_text)
+            if key in seen:
+                continue
+            seen.add(key)
+            issue_id = f"I-{counter:03d}"
+            status = self._customer_issue_status(item["verdict"])
+            rule_text = self._customer_rule_text(rule_id)
+            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
+            check_label = CHECK_TYPE_LABELS[check_type]
+            grouped[check_type].append(
+                {
+                    "id": issue_id,
+                    "issue_id": issue_id,
+                    "status": status,
+                    "status_label": self._customer_status_label(status),
+                    "severity": item.get("severity", self._severity_for_verdict(item["verdict"])),
+                    "category": check_type,
+                    "category_label": check_label,
+                    "reason": self._customer_issue_reason(rule_id, item["reason"]),
+                    "rule_id": rule_id,
+                    "rule_text": rule_text,
+                    "rule": {
+                        "id": rule_id,
+                        "text": rule_text,
+                        "source": "法规/企业规则知识库" if rule_id != "manual_review" else "人工复核策略",
+                    },
+                    "user_text": user_text,
+                    "source": {
+                        "type": "uploaded_document",
+                        "text": user_text,
+                        "evidence_refs": item.get("evidence_refs", []),
+                    },
+                    "impact": self._customer_issue_impact(item["verdict"], rule_id),
+                    "recommendation": item["recommended_action"],
+                    "requires_human_review": bool(item.get("requires_human_review", status != "not_approved")),
+                }
+            )
+            counter += 1
+        issue_groups = [
+            {
+                "id": check_type,
+                "label": CHECK_TYPE_LABELS[check_type],
+                "issue_count": len(grouped[check_type]),
+                "status_counts": self._customer_status_counts(grouped[check_type]),
+                "items": grouped[check_type],
+            }
+            for check_type in check_types
+            if grouped.get(check_type)
+        ]
+        review_scope = self._customer_review_scope(package_precheck, check_types)
+        selected_checks = [{"id": item, "label": CHECK_TYPE_LABELS[item]} for item in check_types]
+        verdict_label = {
+            "pass": "可进入下一步",
+            "needs_review": "需人工复核",
+            "not_approved": "不建议准入",
+            "needs_supplement": "需补充资料",
+        }[customer_verdict]
+        summary = self._customer_summary(case, chief, customer_verdict, issue_groups)
+        issue_count = sum(len(group["items"]) for group in issue_groups)
+        supplement_count = sum(
+            1
+            for group in issue_groups
+            for item in group["items"]
+            if item.get("status") == "needs_supplement"
+        )
+        return {
+            "schema_version": "customer_report.v1",
+            "report_metadata": {
+                "report_type": "chemical_compliance_precheck",
+                "case_id": case["case_id"],
+                "run_id": run_id,
+                "generated_at": generated_at,
+                "locale": "zh-CN",
+            },
+            "case_profile": {
+                "case_id": case["case_id"],
+                "title": case["title"],
+                "review_scenario": {
+                    "id": case.get("review_scenario", "market_access"),
+                    "label": REVIEW_SCENARIO_LABELS.get(case.get("review_scenario", "market_access"), "市场准入预审"),
+                },
+                "target_markets": case.get("target_markets", []),
+                "selected_checks": selected_checks,
+            },
+            "verdict": customer_verdict,
+            "verdict_label": verdict_label,
+            "executive_summary": {
+                "verdict": customer_verdict,
+                "verdict_label": verdict_label,
+                "summary": summary,
+                "issue_count": issue_count,
+                "supplement_count": supplement_count,
+                "not_approved_count": sum(
+                    1 for group in issue_groups for item in group["items"] if item.get("status") == "not_approved"
+                ),
+                "needs_review_count": sum(
+                    1 for group in issue_groups for item in group["items"] if item.get("status") == "needs_review"
+                ),
+            },
+            "summary": summary,
+            "review_scenario": {
+                "id": case.get("review_scenario", "market_access"),
+                "label": REVIEW_SCENARIO_LABELS.get(case.get("review_scenario", "market_access"), "市场准入预审"),
+            },
+            "selected_checks": selected_checks,
+            "review_scope": review_scope,
+            "limited_checks": package_precheck.get("limited_checks", []) if package_precheck else [],
+            "blocked_checks": package_precheck.get("blocked_checks", []) if package_precheck else [],
+            "supplement_actions": combined_supplement_actions,
+            "customer_supplement_actions": [self._customer_action_text(item) for item in combined_supplement_actions],
+            "issue_groups": issue_groups,
+            "compliant_summary": "未展开合规项；客户报告仅列示不合格、复核和补件事项。",
+            "next_actions": self._customer_next_actions(customer_verdict, combined_supplement_actions),
+            "evidence_policy": {
+                "customer_report_includes": ["规则编号", "规则原文", "用户资料原文/识别结果", "影响说明", "整改或补件建议"],
+                "customer_report_excludes": ["RAG chunks", "rerank 分数", "agent 分支原始输出", "trace 节点 JSON"],
+                "admin_evidence_location": "technical_trace / retrieval / agent_branches",
+            },
+            "limitations": self._customer_limitations(package_precheck, customer_verdict),
+            "technical_reference": {
+                "admin_trace_available": True,
+                "trace_fields": ["technical_trace", "retrieval", "agent_branches", "trace"],
+                "run_id": run_id,
+            },
+            "disclaimer": "本结果为 AI 辅助合规预审，不替代最终法规、法律或 EHS 审批意见。",
+        }
+
+    def _dedupe_supplement_actions(self, actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        deduped: dict[tuple[str, str], dict[str, Any]] = {}
+        for action in actions:
+            deduped.setdefault((str(action.get("field", "")), str(action.get("action", ""))), action)
+        return list(deduped.values())
+
+    def _customer_review_scope(self, package_precheck: dict[str, Any] | None, check_types: list[str]) -> dict[str, Any]:
+        if not package_precheck:
+            return {
+                "package_status": "not_prechecked",
+                "message": "本次审查未返回独立资料包预检结果。",
+                "selected_checks": [{"id": item, "label": CHECK_TYPE_LABELS[item]} for item in check_types],
+                "available_checks": [],
+                "limited_checks": [],
+                "blocked_checks": [],
+                "completed_checks": [],
+            }
+        return {
+            "package_status": package_precheck.get("overall_status"),
+            "message": package_precheck.get("user_message"),
+            "selected_checks": package_precheck.get("selected_checks", []),
+            "available_checks": package_precheck.get("available_checks", []),
+            "completed_checks": package_precheck.get("available_checks", []),
+            "limited_checks": package_precheck.get("limited_checks", []),
+            "blocked_checks": package_precheck.get("blocked_checks", []),
+            "recognized_documents": package_precheck.get("recognized_documents", []),
+            "missing_documents": package_precheck.get("missing_documents", []),
+        }
+
+    def _customer_verdict(self, chief_verdict: str, document_quality: dict[str, Any], package_precheck: dict[str, Any] | None = None) -> str:
+        if package_precheck and package_precheck.get("overall_status") in {"needs_supplement", "unreadable"}:
+            return "needs_supplement"
+        if document_quality.get("status") == "needs_supplement":
+            return "needs_supplement"
+        if chief_verdict == "不合规":
+            return "not_approved"
+        if chief_verdict == "复核":
+            return "needs_review"
+        return "pass"
+
+    def _customer_issue_status(self, verdict: str) -> str:
+        return {"不合规": "not_approved", "复核": "needs_review"}.get(verdict, "needs_review")
+
+    def _customer_status_label(self, status: str) -> str:
+        return {
+            "pass": "可进入下一步",
+            "needs_review": "需人工复核",
+            "not_approved": "不建议准入",
+            "needs_supplement": "需补充资料",
+        }.get(status, "需人工复核")
+
+    def _customer_status_counts(self, items: list[dict[str, Any]]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in items:
+            status = str(item.get("status", "needs_review"))
+            counts[status] = counts.get(status, 0) + 1
+        return counts
+
+    def _customer_limitations(self, package_precheck: dict[str, Any] | None, verdict: str) -> list[str]:
+        limitations: list[str] = ["本报告为预审结论，仍需按企业内部 EHS、法规和采购流程完成最终审批。"]
+        if not package_precheck:
+            limitations.append("本次响应未包含独立资料包预检结果，审查范围需由管理端复核确认。")
+            return limitations
+        if package_precheck.get("overall_status") in {"needs_supplement", "unreadable"}:
+            limitations.append("资料包尚不能完整支撑所选审查范围，结论优先用于补件和复核安排。")
+        limited = package_precheck.get("limited_checks", [])
+        blocked = package_precheck.get("blocked_checks", [])
+        if limited:
+            labels = "、".join(item["label"] for item in limited[:4])
+            limitations.append(f"以下检查受资料缺口影响，只能作为初筛或复核依据：{labels}。")
+        if blocked:
+            labels = "、".join(item["label"] for item in blocked[:4])
+            limitations.append(f"以下检查当前不能形成可靠判断：{labels}。")
+        if verdict == "pass":
+            limitations.append("未发现不合格或复核事项不等同于最终法规放行。")
+        return limitations
+
+    def _is_positive_rule(self, rule_id: str) -> bool:
+        return rule_id in {
+            "sds_complete",
+            "formula_components_known",
+            "process_parameters_present",
+            "storage_compatible",
+            "source_backed_no_restricted_demo_match",
+        }
+
+    def _customer_summary(
+        self,
+        case: dict[str, Any],
+        chief: dict[str, Any],
+        customer_verdict: str,
+        issue_groups: list[dict[str, Any]],
+    ) -> str:
+        issue_count = sum(len(group["items"]) for group in issue_groups)
+        markets = "、".join(case.get("target_markets", [])) or "未指定"
+        if customer_verdict == "pass":
+            return f"{case['title']}面向{markets}的预审未发现需要客户立即处理的不合格或复核事项。"
+        if customer_verdict == "needs_supplement":
+            supplement_count = sum(1 for group in issue_groups for item in group["items"] if item.get("status") == "needs_supplement")
+            return f"{case['title']}面向{markets}的预审暂不能形成准入结论。系统识别到 {supplement_count or issue_count} 项关键资料缺口，请先补充资料后再重新预审。"
+        label = {"needs_supplement": "补充资料", "needs_review": "人工复核", "not_approved": "不建议准入"}[customer_verdict]
+        reason = "；".join(chief.get("reasons", [])[:2])
+        return f"{case['title']}面向{markets}的预审结论为{label}，共发现 {issue_count} 项需处理事项。{reason}"
+
+    def _customer_next_actions(self, verdict: str, supplement_actions: list[dict[str, Any]]) -> list[str]:
+        if supplement_actions:
+            return [self._customer_action_text(item) for item in supplement_actions[:6]]
+        if verdict == "not_approved":
+            return ["暂停当前物料准入，要求供应商调整配方、工艺或储运方案后重新提交。"]
+        if verdict == "needs_review":
+            return ["提交 EHS/法规负责人复核，并补充必要的供应商声明或测试依据。"]
+        return ["进入企业内部准入审批或小范围试用流程。"]
+
+    def _check_type_for_risk_item(self, item: dict[str, Any]) -> str:
+        rule_id = item["rule_refs"][0] if item.get("rule_refs") else ""
+        if rule_id.startswith("sds_") or rule_id in {"formula_components_missing", "process_parameters_missing", "knowledge_pack_missing_review"}:
+            return "sds_key_sections" if rule_id.startswith("sds_") else "intake_readiness"
+        if rule_id in {"incompatibility_oxidizer_flammable", "incompatibility_hypochlorite_acid", "flammable_storage_missing", "transport_un_mismatch"}:
+            return "compatibility_risk" if rule_id.startswith("incompatibility_") else "storage_transport"
+        if rule_id in {"oxidizer_high_temperature_process", "process_parameters_present"}:
+            return "process_fit"
+        if rule_id in {"hazardous_catalog_match", "svhc_threshold_match", "tsca_inventory_match", "knowledge_no_match_review"}:
+            return "regulatory_screening"
+        if rule_id in {"unknown_substance_review", "enterprise_redline_benzene"}:
+            return "restricted_substance"
+        return "ingredient_identity"
+
+    def _customer_rule_text(self, rule_id: str) -> str:
+        if rule_id == "manual_review":
+            return "系统未能形成自动放行结论时，应进入人工复核。"
+        source = self._source_for_rule(rule_id)
+        return self._snippet_for_rule(rule_id, source["content"])
+
+    def _customer_issue_reason(self, rule_id: str, fallback: str) -> str:
+        reasons = {
+            "sds_complete": "SDS 结构可读取，但仍需结合配方、工艺和所选市场完成审查。",
+            "sds_missing_sections": "SDS 章节不完整，资料不能支撑完整合规预审。",
+            "formula_components_missing": "配方或 SDS 未提供足够的成分、CAS 或浓度信息。",
+            "process_parameters_missing": "工艺温度、压力或关键步骤信息不足。",
+            "unknown_substance_review": "存在未知 CAS 或未进入物质主数据的成分。",
+            "knowledge_no_match_review": "知识库未能为部分物质或法规方向提供充分命中证据。",
+            "knowledge_pack_missing_review": "知识库未加载，不能形成证据充分的预审结论。",
+            "incompatibility_oxidizer_flammable": "资料显示可燃液体与氧化剂存在同配方、同使用或同储风险。",
+            "incompatibility_hypochlorite_acid": "资料显示次氯酸盐与酸类存在禁忌组合风险。",
+            "enterprise_redline_benzene": "资料中包含企业准入红线物质。",
+            "flammable_storage_missing": "含可燃组分但储存隔离、防火或通风条件不足。",
+            "oxidizer_high_temperature_process": "氧化剂涉及高温或不明确工艺条件，需要工艺安全复核。",
+            "transport_un_mismatch": "运输信息与物质风险不一致或不足。",
+            "hazardous_catalog_match": "物质存在危化品目录命中信号，需要结合法规和用途复核。",
+            "svhc_threshold_match": "物质存在 SVHC 阈值相关风险，需要补充 REACH/SVHC 证明。",
+            "tsca_inventory_match": "物质涉及 TSCA 清单核验，需要确认美国市场状态。",
+        }
+        return reasons.get(rule_id, fallback.removeprefix(f"命中规则 {rule_id}："))
+
+    def _customer_user_text(self, evidence_refs: list[str], evidence_chain: list[dict[str, Any]]) -> str:
+        refs = set(evidence_refs)
+        for evidence in evidence_chain:
+            if evidence["ref"] in refs and evidence["type"] == "资料":
+                return evidence["snippet"]
+        for evidence in evidence_chain:
+            if evidence["ref"] in refs:
+                return evidence["snippet"]
+        return evidence_chain[0]["snippet"] if evidence_chain else "用户资料未提供可直接引用的原文。"
+
+    def _customer_issue_impact(self, verdict: str, rule_id: str) -> str:
+        if verdict == "不合规":
+            return "该事项触发硬性拦截或企业红线，当前资料不支持直接准入。"
+        if rule_id in {"sds_missing_sections", "formula_components_missing", "process_parameters_missing", "knowledge_pack_missing_review"}:
+            return "资料基础不足，系统不能形成证据充分的自动放行意见。"
+        return "该事项存在不确定性，需要 EHS/法规人员结合业务场景确认。"
 
     def _review_checklist(
         self,

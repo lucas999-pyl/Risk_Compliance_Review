@@ -26,11 +26,20 @@ from app.models import (
     TechnologyRunCreate,
 )
 from app.ai_clients import AIClientConfig, EmbeddingClient
-from app.chemical_rag import ChemicalRagRunner
+from app.chemical_rag import ChemicalRagRunner, CHECK_TYPE_LABELS, LEGACY_CHECK_TYPE_MAP, SCENARIO_RECOMMENDED_CHECK_TYPES
 from app.service import ComplianceReviewService
 from app.settings import Settings
 from app.store import SQLiteStore
 from app.vector_store import SQLiteVectorStore
+
+
+REVIEW_SCENARIO_LABELS_FOR_FACTORY = {
+    "market_access": "市场准入预审",
+    "substitution": "替代物料评估",
+    "supplier_intake": "供应商资料准入",
+    "process_introduction": "工艺导入风险评估",
+    "storage_safety": "储运与现场安全评估",
+}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -251,39 +260,182 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict:
         return runner.retrieval_preview(payload.case_id, top_k=payload.top_k)
 
+    @app.get("/chemical/cases")
+    def chemical_case_list() -> dict:
+        return {"cases": store.list_cases()}
+
+    @app.delete("/chemical/cases")
+    def chemical_case_clear() -> dict:
+        return store.delete_cases()
+
+    @app.post("/chemical/cases", status_code=201)
+    def chemical_case_create(payload: CaseCreate) -> dict:
+        return store.create_case(
+            CaseCreate(
+                title=payload.title,
+                material_type=payload.material_type,
+                target_markets=payload.target_markets,
+                intended_use=payload.intended_use,
+                review_scenario=payload.review_scenario,
+                check_types=_normalize_check_type_list(payload.check_types, payload.review_scenario),
+            )
+        )
+
+    @app.get("/chemical/cases/{case_id}")
+    def chemical_case_detail(case_id: str) -> dict:
+        case = store.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        latest_report = store.latest_report(case_id)
+        latest_payload = latest_report["payload"] if latest_report else None
+        return {
+            "case": case,
+            "documents": store.get_documents(case_id),
+            "document_count": len(store.get_documents(case_id)),
+            "latest_report": latest_payload,
+            "package_precheck": latest_payload.get("package_precheck") if latest_payload else None,
+        }
+
+    @app.post("/chemical/cases/{case_id}/documents", status_code=201)
+    async def chemical_case_upload_documents(
+        case_id: str,
+        documents: list[UploadFile] = File(...),
+        runner: ChemicalRagRunner = Depends(get_chemical_runner),
+    ) -> dict:
+        case = store.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        uploaded_documents = [
+            runner.uploaded_document_from_bytes(
+                filename=upload.filename or "document.txt",
+                content_type=upload.content_type,
+                raw=await upload.read(),
+            )
+            for upload in documents
+        ]
+        package = runner._classify_uploaded_package(uploaded_documents)
+        package_precheck = runner.build_package_precheck(
+            package["original_documents"],
+            review_scenario=case.get("review_scenario", "market_access"),
+            check_types=case.get("check_types") or None,
+        )
+        saved = _persist_uploaded_documents(store, case_id, package["original_documents"])
+        return {"case_id": case_id, "document_count": len(saved), "documents": saved, "package_precheck": package_precheck}
+
+    @app.post("/chemical/cases/{case_id}/run-review", status_code=201)
+    def chemical_case_run_review(
+        case_id: str,
+        review_task: str = Form("请基于上传资料执行化工物料准入风险预审。"),
+        top_k: int = Form(5),
+        runner: ChemicalRagRunner = Depends(get_chemical_runner),
+    ) -> dict:
+        case = store.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        documents = _documents_for_runner(store, case_id)
+        if not any(document.get("text_source") != "missing" for document in documents):
+            raise HTTPException(status_code=400, detail="Case has no uploaded documents")
+        trace = runner.run_uploaded_document_package(
+            title=case["title"],
+            case_id=case_id,
+            review_task=review_task,
+            review_scenario=case.get("review_scenario", "market_access"),
+            check_types=case.get("check_types") or None,
+            target_markets=case.get("target_markets", ["CN", "EU", "US"]),
+            top_k=max(1, min(int(top_k), 20)),
+            documents=documents,
+        )
+        _persist_case_review(store, case_id, trace)
+        return trace
+
     @app.post("/chemical/upload-review", status_code=201)
     async def chemical_upload_review(
         title: str = Form(...),
         review_task: str = Form("请基于上传资料执行化工物料准入风险预审。"),
+        review_scenario: str = Form("market_access"),
+        check_types: str = Form(""),
         target_markets: str = Form("CN,EU,US"),
         top_k: int = Form(5),
-        sds_file: UploadFile = File(...),
-        formula_file: UploadFile = File(...),
-        process_file: UploadFile = File(...),
+        documents: list[UploadFile] | None = File(None),
+        sds_file: UploadFile | None = File(None),
+        formula_file: UploadFile | None = File(None),
+        process_file: UploadFile | None = File(None),
         runner: ChemicalRagRunner = Depends(get_chemical_runner),
     ) -> dict:
         top_k = max(1, min(int(top_k), 20))
-        return runner.run_uploaded_documents(
+        selected_checks = _parse_check_types(check_types, review_scenario)
+        case = store.create_case(
+            CaseCreate(
+                title=title,
+                target_markets=_parse_target_markets(target_markets),
+                intended_use=REVIEW_SCENARIO_LABELS_FOR_FACTORY.get(review_scenario, review_scenario),
+                review_scenario=review_scenario,
+                check_types=selected_checks,
+            )
+        )
+        if documents:
+            uploaded_documents = [
+                runner.uploaded_document_from_bytes(
+                    filename=upload.filename or "document.txt",
+                    content_type=upload.content_type,
+                    raw=await upload.read(),
+                )
+                for upload in documents
+            ]
+            trace = runner.run_uploaded_document_package(
+                title=title,
+                case_id=case["id"],
+                review_task=review_task,
+                review_scenario=review_scenario,
+                check_types=selected_checks,
+                target_markets=_parse_target_markets(target_markets),
+                top_k=top_k,
+                documents=uploaded_documents,
+            )
+            _persist_uploaded_documents(store, case["id"], trace.get("_classified_documents", uploaded_documents))
+            trace.pop("_classified_documents", None)
+            _persist_case_review(store, case["id"], trace)
+            return trace
+        if not sds_file or not formula_file or not process_file:
+            raise HTTPException(status_code=400, detail="请上传 documents 文件列表，或同时上传 sds_file、formula_file、process_file。")
+        sds_document = runner.uploaded_document_from_bytes(
+            filename=sds_file.filename or "sds.txt",
+            content_type=sds_file.content_type,
+            raw=await sds_file.read(),
+        )
+        formula_document = runner.uploaded_document_from_bytes(
+            filename=formula_file.filename or "formula.txt",
+            content_type=formula_file.content_type,
+            raw=await formula_file.read(),
+        )
+        process_document = runner.uploaded_document_from_bytes(
+            filename=process_file.filename or "process.txt",
+            content_type=process_file.content_type,
+            raw=await process_file.read(),
+        )
+        trace = runner.run_uploaded_documents(
             title=title,
+            case_id=case["id"],
             review_task=review_task,
+            review_scenario=review_scenario,
+            check_types=selected_checks,
             target_markets=_parse_target_markets(target_markets),
             top_k=top_k,
-            sds=runner.uploaded_document_from_bytes(
-                filename=sds_file.filename or "sds.txt",
-                content_type=sds_file.content_type,
-                raw=await sds_file.read(),
-            ),
-            formula=runner.uploaded_document_from_bytes(
-                filename=formula_file.filename or "formula.txt",
-                content_type=formula_file.content_type,
-                raw=await formula_file.read(),
-            ),
-            process=runner.uploaded_document_from_bytes(
-                filename=process_file.filename or "process.txt",
-                content_type=process_file.content_type,
-                raw=await process_file.read(),
-            ),
+            sds=sds_document,
+            formula=formula_document,
+            process=process_document,
         )
+        _persist_uploaded_documents(
+            store,
+            case["id"],
+            [
+                {**sds_document, "document_type": "sds"},
+                {**formula_document, "document_type": "formula"},
+                {**process_document, "document_type": "process"},
+            ],
+        )
+        _persist_case_review(store, case["id"], trace)
+        return trace
 
     @app.post("/technology/runs", status_code=201)
     def create_technology_run(
@@ -304,3 +456,93 @@ def _parse_target_markets(value: str) -> list[str]:
     markets = [item.strip().upper() for item in value.replace(";", ",").split(",") if item.strip()]
     filtered = [item for item in markets if item in allowed]
     return filtered or ["CN", "EU", "US"]
+
+
+def _recommended_checks_for_scenario(review_scenario: str | None) -> list[str]:
+    scenario = review_scenario if review_scenario in SCENARIO_RECOMMENDED_CHECK_TYPES else "market_access"
+    return list(SCENARIO_RECOMMENDED_CHECK_TYPES[scenario])
+
+
+def _parse_check_types(value: str, review_scenario: str | None = None) -> list[str]:
+    items = [item.strip() for item in value.replace(";", ",").replace("，", ",").split(",") if item.strip()]
+    return _normalize_check_type_list(items, review_scenario)
+
+
+def _normalize_check_type_list(value: list[str], review_scenario: str | None = None) -> list[str]:
+    normalized = []
+    for item in value:
+        for mapped in LEGACY_CHECK_TYPE_MAP.get(item, [item]):
+            if mapped in CHECK_TYPE_LABELS and mapped not in normalized:
+                normalized.append(mapped)
+    return normalized or _recommended_checks_for_scenario(review_scenario)
+
+
+def _persist_uploaded_documents(store: SQLiteStore, case_id: str, documents: list[dict]) -> list[dict]:
+    saved = []
+    for document in documents:
+        if document.get("text_source") == "missing":
+            continue
+        parsed = document.get("parsed_document")
+        saved.append(
+            store.insert_document(
+                case_id=case_id,
+                document_type=document.get("document_type", "document"),
+                filename=document.get("filename", "document.txt"),
+                source_name=None,
+                content_type=document.get("content_type"),
+                sha256=document.get("sha256", ""),
+                storage_path=document.get("path") or document.get("filename", "document.txt"),
+                text_content=document.get("content", ""),
+                metadata=getattr(parsed, "metadata", {}) if parsed is not None else {},
+                parse_status=getattr(parsed, "parse_status", "needs_manual_review") if parsed is not None else "needs_manual_review",
+                extracted_fields=getattr(parsed, "extracted_fields", {}) if parsed is not None else {},
+                missing_fields=getattr(parsed, "missing_fields", []) if parsed is not None else [],
+                needs_manual_review=getattr(parsed, "needs_manual_review", True) if parsed is not None else True,
+                text_source=document.get("text_source", "text"),
+            )
+        )
+    return saved
+
+
+def _documents_for_runner(store: SQLiteStore, case_id: str) -> list[dict]:
+    documents = []
+    with store.connect() as connection:
+        rows = connection.execute(
+            "SELECT * FROM documents WHERE case_id = ? ORDER BY created_at",
+            (case_id,),
+        ).fetchall()
+    for row in rows:
+        data = dict(row)
+        documents.append(
+            {
+                "filename": data["filename"],
+                "path": data["storage_path"],
+                "content": data["text_content"],
+                "content_type": data["content_type"],
+                "text_source": data.get("text_source", "text"),
+                "parse_status": data.get("parse_status", "needs_manual_review"),
+                "sha256": data["sha256"],
+                "document_type": data["document_type"],
+            }
+        )
+    return documents
+
+
+def _persist_case_review(store: SQLiteStore, case_id: str, trace: dict) -> None:
+    report = store.create_report(case_id, trace)
+    verdict = trace.get("customer_report", {}).get("verdict")
+    store.update_case_review_state(
+        case_id=case_id,
+        status=_case_status_from_customer_verdict(verdict),
+        latest_verdict=verdict,
+        latest_report_id=report["id"],
+    )
+
+
+def _case_status_from_customer_verdict(verdict: str | None) -> str:
+    return {
+        "pass": "ready_for_next_step",
+        "needs_supplement": "needs_supplement",
+        "needs_review": "needs_review",
+        "not_approved": "not_approved",
+    }.get(verdict or "", "draft")

@@ -23,8 +23,13 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
 
     assert response.status_code == 200
     assert "化工合规 RAG 工具" in response.text
-    assert "知识库工作台" in response.text
-    assert "上传审查" in response.text
+    assert "客户预审" in response.text
+    assert "Case 流程" in response.text
+    assert "创建 Case" in response.text
+    assert "上传资料包" in response.text
+    assert "资料包预检" in response.text
+    assert "客户报告" in response.text
+    assert "管理端" in response.text
     assert "向量检索实验" in response.text
     assert "RAG 链路" in response.text
     assert "TopK 原始召回" in response.text
@@ -42,6 +47,55 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
     assert "/chemical/knowledge/search" in response.text
     assert "技术流程 Demo" not in response.text
     assert "鍖栧" not in response.text
+
+
+def test_customer_case_flow_is_primary_and_admin_debug_is_isolated() -> None:
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="customerWorkbench"' in html
+    assert 'id="adminWorkbench"' in html
+    assert 'data-mode="customer"' in html
+    assert 'data-mode="admin"' in html
+    assert "Case 流程" in html
+    assert "1 创建 Case" in html
+    assert "2 上传资料包" in html
+    assert "3 资料包预检" in html
+    assert "4 审查范围" in html
+    assert "5 客户报告" in html
+    assert 'id="createCase"' in html
+    assert 'id="uploadCaseDocuments"' in html
+    assert 'id="clearCases"' in html
+    assert 'id="runCaseReview"' in html
+    assert "选择资料包" in html
+    assert "上传并预检" in html
+    assert "不会运行正式审查" in html
+    assert "保持新建表单" in html
+    assert "function fillCaseFormFromCase" in html
+    assert '$("uploadTitle").value = item.title' not in html
+    assert "function renderCustomerFriendlyVerdict" in html
+    assert "function customerFieldLabel" in html
+    customer_html = html[html.index('id="customerWorkbench"') : html.index('id="adminWorkbench"')]
+    assert "合规 / 复核 / 不合规" not in customer_html
+    assert "规则：" not in customer_html
+    assert "review_workbench.document_quality" not in customer_html
+    assert "function ensureCaseReadyForReview" in html
+    assert "await uploadCaseDocuments();" in html
+    assert "await createCase();" in html
+    assert 'api("/chemical/cases", { method: "DELETE" })' in html
+    assert "/chemical/cases/${caseId}/documents" in html
+    assert "/chemical/cases/${caseId}/run-review" in html
+    assert "function setWorkbenchMode" in html
+    assert "function updateCaseActionState" in html
+
+    customer_start = html.index('id="customerWorkbench"')
+    admin_start = html.index('id="adminWorkbench"')
+    customer_html = html[customer_start:admin_start]
+    assert "Trace JSON" not in customer_html
+    assert "TopK 原始召回" not in customer_html
+    assert "Agent 分支分析" not in customer_html
+    assert 'id="reviewTask"' not in customer_html
+    assert "Trace JSON" in html[admin_start:]
+    assert "Agent 分支分析" in html[admin_start:]
 
 
 def test_trace_node_click_selection_is_not_reset_on_rerender() -> None:
@@ -198,7 +252,7 @@ def test_static_workbench_locks_actions_while_uploading_knowledge_pack() -> None
     assert "$(\"uploadKnowledgePack\").disabled = busy;" in html
     assert "$(\"loadChunks\").disabled = busy;" in html
     assert "$(\"clearKnowledge\").disabled = busy;" in html
-    assert "$(\"runUploadReview\").disabled = busy || !state.knowledgeLoaded;" in html
+    assert "$(\"runCaseReview\").disabled = busy || !state.knowledgeLoaded;" in html
 
 
 def test_static_workbench_demotes_quality_evaluation_to_collapsed_developer_panel() -> None:

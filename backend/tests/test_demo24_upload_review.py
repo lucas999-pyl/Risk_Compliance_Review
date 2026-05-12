@@ -20,7 +20,7 @@ def test_upload_review_runs_real_uploaded_documents_through_rag_stack(tmp_path: 
     payload = _upload_sample(client, "incompatible_oxidizer_flammable")
 
     assert payload["case_source"] == "uploaded"
-    assert payload["case_id"].startswith("upload_")
+    assert payload["case_id"].startswith("case_")
     assert payload["verdict"] == "不合规"
     assert payload["needs_human"] is False
     assert "evaluation" not in payload

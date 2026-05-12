@@ -16,11 +16,15 @@ class CaseCreate(BaseModel):
     material_type: str = Field(default="mixture")
     target_markets: list[Jurisdiction] = Field(default_factory=lambda: ["CN", "EU", "US"])
     intended_use: str | None = None
+    review_scenario: str = "market_access"
+    check_types: list[str] = Field(default_factory=list)
 
 
 class CaseRecord(CaseCreate):
     id: str
     status: str
+    latest_verdict: str | None = None
+    latest_report_id: str | None = None
     created_at: datetime
 
 

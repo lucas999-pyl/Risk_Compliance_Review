@@ -196,6 +196,10 @@ class SQLiteStore:
             self._ensure_column(connection, "knowledge_chunks", "quality_tier", "TEXT NOT NULL DEFAULT 'unspecified'")
             self._ensure_column(connection, "knowledge_chunks", "retrieved_at", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "knowledge_chunks", "document_role", "TEXT NOT NULL DEFAULT 'general'")
+            self._ensure_column(connection, "cases", "review_scenario", "TEXT NOT NULL DEFAULT 'market_access'")
+            self._ensure_column(connection, "cases", "check_types", "TEXT NOT NULL DEFAULT '[]'")
+            self._ensure_column(connection, "cases", "latest_verdict", "TEXT")
+            self._ensure_column(connection, "cases", "latest_report_id", "TEXT")
 
     def _ensure_column(self, connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
         columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -210,22 +214,83 @@ class SQLiteStore:
             "target_markets": payload.target_markets,
             "intended_use": payload.intended_use,
             "status": "draft",
+            "review_scenario": getattr(payload, "review_scenario", "market_access"),
+            "check_types": getattr(payload, "check_types", []),
+            "latest_verdict": None,
+            "latest_report_id": None,
             "created_at": utc_now(),
         }
         with self._lock, self.connect() as connection:
             connection.execute(
                 """
-                INSERT INTO cases (id, title, material_type, target_markets, intended_use, status, created_at)
-                VALUES (:id, :title, :material_type, :target_markets, :intended_use, :status, :created_at)
+                INSERT INTO cases
+                (id, title, material_type, target_markets, intended_use, status, review_scenario, check_types, latest_verdict, latest_report_id, created_at)
+                VALUES
+                (:id, :title, :material_type, :target_markets, :intended_use, :status, :review_scenario, :check_types, :latest_verdict, :latest_report_id, :created_at)
                 """,
-                {**row, "target_markets": json.dumps(row["target_markets"])},
+                {**row, "target_markets": json.dumps(row["target_markets"]), "check_types": json.dumps(row["check_types"])},
             )
         return row
+
+    def list_cases(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT c.*,
+                       COUNT(d.id) AS document_count,
+                       MAX(r.created_at) AS latest_report_created_at
+                FROM cases c
+                LEFT JOIN documents d ON d.case_id = c.id
+                LEFT JOIN reports r ON r.id = c.latest_report_id
+                GROUP BY c.id
+                ORDER BY c.created_at DESC
+                """
+            ).fetchall()
+        return [self._case_summary_from_row(row) for row in rows]
 
     def get_case(self, case_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
         return self._case_from_row(row) if row else None
+
+    def delete_cases(self) -> dict[str, int]:
+        with self._lock, self.connect() as connection:
+            case_count = connection.execute("SELECT COUNT(*) AS count FROM cases").fetchone()["count"]
+            document_count = connection.execute("SELECT COUNT(*) AS count FROM documents").fetchone()["count"]
+            report_count = connection.execute("SELECT COUNT(*) AS count FROM reports").fetchone()["count"]
+            connection.execute("DELETE FROM review_decisions")
+            connection.execute("DELETE FROM audit_logs")
+            connection.execute("DELETE FROM findings")
+            connection.execute("DELETE FROM agent_runs")
+            connection.execute("DELETE FROM material_components")
+            connection.execute("DELETE FROM extracted_sections")
+            connection.execute("DELETE FROM extraction_reviews")
+            connection.execute("DELETE FROM documents")
+            connection.execute("DELETE FROM reports")
+            connection.execute("DELETE FROM cases")
+        return {
+            "deleted_cases": int(case_count or 0),
+            "deleted_documents": int(document_count or 0),
+            "deleted_reports": int(report_count or 0),
+        }
+
+    def update_case_review_state(
+        self,
+        *,
+        case_id: str,
+        status: str,
+        latest_verdict: str | None,
+        latest_report_id: str | None,
+    ) -> None:
+        with self._lock, self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE cases
+                SET status = ?, latest_verdict = ?, latest_report_id = COALESCE(?, latest_report_id)
+                WHERE id = ?
+                """,
+                (status, latest_verdict, latest_report_id, case_id),
+            )
 
     def insert_document(
         self,
@@ -671,9 +736,34 @@ class SQLiteStore:
             )
         return {**row, "payload": payload}
 
+    def latest_report(self, case_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM reports
+                WHERE case_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (case_id,),
+            ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data["payload"] = loads(data["payload_json"], {})
+        data.pop("payload_json", None)
+        return data
+
     def _case_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
         data["target_markets"] = loads(data["target_markets"], [])
+        data["check_types"] = loads(data.get("check_types"), [])
+        return data
+
+    def _case_summary_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        data = self._case_from_row(row)
+        data["document_count"] = int(data.get("document_count") or 0)
+        data["latest_report_created_at"] = data.get("latest_report_created_at")
         return data
 
     def _document_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
