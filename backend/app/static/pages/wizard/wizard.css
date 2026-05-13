@@ -1,0 +1,452 @@
+/* wizard.css — Wizard 5 步 page-specific 样式
+   抽自 docs/UI_v01/02-06 wizard 各帧 `.frame` 内部段（剥离 .caption / nav / pbar / stepbar / side）。
+   tokens.css / shell.css 已先于此加载；本文件只引用 token 变量，不重声明。 */
+
+/* 主区容器（每步通用） */
+.wzbody {
+  padding: 64px 80px 40px;
+  max-width: 1100px;
+}
+.wzbody h1 {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+.wzbody .lead {
+  font-size: 17px;
+  color: var(--ink-48);
+  margin-top: 12px;
+  letter-spacing: -0.374px;
+  max-width: 680px;
+}
+.wzbody section { margin-top: 48px; }
+
+/* —— 表单字段（Step 1 / Step 2） —— */
+.field { margin-bottom: 32px; }
+.field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.224px;
+  margin-bottom: 10px;
+}
+.field .hint {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  margin-bottom: 10px;
+}
+.field input[type=text] {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  font: inherit;
+  font-family: var(--font-text);
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.374px;
+}
+.field input[type=text]:focus {
+  outline: 2px solid var(--primary-focus);
+  outline-offset: -2px;
+  border-color: transparent;
+}
+.field .select { position: relative; }
+.field .select select {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  font: inherit;
+  font-family: var(--font-text);
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.374px;
+  appearance: none;
+}
+.field .select::after {
+  content: "⌄";
+  position: absolute;
+  right: 18px;
+  top: 14px;
+  color: var(--ink-48);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.toggle-chips { display: flex; gap: 12px; flex-wrap: wrap; }
+.toggle {
+  padding: 10px 18px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink);
+  letter-spacing: -0.224px;
+  font-family: var(--font-text);
+}
+.toggle.on {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(0, 102, 204, 0.04);
+}
+
+/* —— 底部步骤导航 —— */
+.wzfoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 80px;
+  border-top: 1px solid var(--divider-soft);
+  background: var(--canvas);
+  max-width: 1100px;
+}
+.wzfoot .step-tag {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+}
+
+/* —— 上传 dropzone —— */
+.dropzone {
+  margin-top: 16px;
+  border: 1px dashed var(--hairline);
+  border-radius: 18px;
+  background: var(--parchment);
+  padding: 64px 32px;
+  text-align: center;
+  transition: background 120ms, border-color 120ms;
+}
+.dropzone.dragover {
+  background: rgba(0, 102, 204, 0.04);
+  border-color: var(--primary);
+}
+.dropzone .big {
+  font-size: 40px;
+  color: var(--ink-48);
+  line-height: 1;
+  font-weight: 300;
+}
+.dropzone .t {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 18px;
+  letter-spacing: -0.374px;
+}
+.dropzone .h {
+  font-size: 14px;
+  color: var(--ink-48);
+  margin-top: 8px;
+  letter-spacing: -0.12px;
+}
+.dropzone .actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* —— 上传列表 —— */
+.uplist {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.uprow {
+  display: grid;
+  grid-template-columns: 24px 1fr 100px 130px 100px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+.uprow .name { color: var(--ink); font-weight: 600; }
+.uprow .name small {
+  display: block;
+  color: var(--ink-48);
+  font-weight: 400;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.uprow .size { color: var(--ink-48); text-align: right; font-variant-numeric: tabular-nums; }
+.uprow .progressbar {
+  height: 4px;
+  background: var(--divider-soft);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.uprow .progressbar > i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 200ms ease;
+}
+.uprow .state { text-align: right; color: var(--ink-48); font-size: 13px; }
+.uprow .state.done { color: var(--pass); }
+.uprow .state.err { color: var(--block); }
+.uprow .icon-doc {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--parchment);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ink-48);
+  font-weight: 600;
+}
+
+/* —— Step 3 metric 卡 —— */
+.mc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.mc {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mc .lab {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mc .num {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  margin-top: 8px;
+}
+.mc .num.mute { color: var(--mute); }
+.mc .desc { font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px; }
+
+/* —— Step 3 文件识别明细 —— */
+.file-ident {
+  display: grid;
+  grid-template-columns: 24px 1fr 140px 90px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border-bottom: 1px solid var(--divider-soft);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+.file-ident:last-child { border-bottom: none; }
+.file-ident .name { color: var(--ink); font-weight: 600; }
+.file-ident .desc { color: var(--ink-48); font-size: 13px; }
+.file-ident .pct { font-variant-numeric: tabular-nums; color: var(--ink-48); text-align: right; }
+
+/* —— Step 4 审查范围 —— */
+.scope-group { margin-bottom: 32px; }
+.scope-group h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-48);
+  text-transform: none;
+  letter-spacing: -0.224px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.scope-group h3 .ct { font-weight: 400; color: var(--mute); }
+.scope-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 220px;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--divider-soft);
+  align-items: center;
+  font-size: 14px;
+  letter-spacing: -0.224px;
+  cursor: pointer;
+  user-select: none;
+}
+.scope-row:hover { background: var(--pearl); }
+.scope-row.recommended { background: rgba(0, 102, 204, 0.03); }
+.scope-row .cb {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--canvas);
+  display: inline-block;
+  position: relative;
+}
+.scope-row.on .cb { background: var(--primary); border-color: var(--primary); }
+.scope-row.on .cb::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.scope-row .lbl { color: var(--ink); }
+.scope-row .lbl small {
+  display: block;
+  color: var(--ink-48);
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+  letter-spacing: -0.12px;
+}
+.scope-row .rule {
+  color: var(--ink-48);
+  font-size: 12px;
+  font-family: var(--font-text);
+  text-align: right;
+  letter-spacing: -0.12px;
+}
+
+/* —— Step 5 运行预审 runcard —— */
+.runcard {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  padding: 32px 40px;
+  margin-top: 32px;
+}
+.runcard .total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 24px;
+}
+.runcard .total .t {
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.374px;
+}
+.runcard .total .pct {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.runcard .bar {
+  height: 4px;
+  background: var(--divider-soft);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.runcard .bar > i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 240ms ease;
+}
+.runcard .sub-h {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  margin-bottom: 12px;
+}
+.runcard .row {
+  display: grid;
+  grid-template-columns: 14px 1fr 140px;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider-soft);
+  align-items: center;
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+.runcard .row:last-child { border-bottom: none; }
+.runcard .row .dot.lg { margin: 0; }
+.runcard .row .n.done {
+  color: var(--ink-48);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-48);
+}
+.runcard .row .n.curr { color: var(--ink); font-weight: 600; }
+.runcard .row .n.mute { color: var(--mute); }
+.runcard .row .st { text-align: right; font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px; }
+.runcard .row .st.warn { color: var(--warn); }
+.runcard .row .st.err { color: var(--block); }
+.runcard .row .st.done { color: var(--pass); }
+
+/* spinner（小型）— 子任务进行中提示 */
+.spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--warn);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: wz-sp 0.8s linear infinite;
+  vertical-align: middle;
+}
+@keyframes wz-sp { to { transform: rotate(360deg); } }
+
+/* —— Step 3 / Step 5 alert-card（受限阻断 / 失败提示） —— */
+.alert-card {
+  margin-top: 32px;
+  padding: 24px;
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  background: var(--canvas);
+}
+.alert-card .head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.224px;
+  margin-bottom: 14px;
+}
+.alert-card ul { list-style: none; padding: 0; margin: 0; }
+.alert-card li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider-soft);
+  font-size: 14px;
+  color: var(--ink-80);
+  letter-spacing: -0.224px;
+}
+.alert-card li:last-child { border-bottom: none; }
+.alert-card li b { font-weight: 600; color: var(--ink); }
+.alert-card .act { margin-top: 14px; display: flex; justify-content: flex-end; gap: 12px; }
+
+/* —— 通用 wizard error / inline notice —— */
+.wz-error {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(255, 59, 48, 0.06);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  color: var(--block);
+  font-size: 13px;
+  letter-spacing: -0.12px;
+}

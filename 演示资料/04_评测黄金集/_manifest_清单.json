@@ -1,0 +1,104 @@
+{
+  "dataset_id": "chemical_compliance_pre_review_golden_v1",
+  "version": "1.0.0",
+  "created_for": "供应商物料准入风险合规预审 Demo",
+  "data_policy": {
+    "synthetic": true,
+    "legal_or_regulatory_advice": false,
+    "copyrighted_standards_included": false,
+    "notes": "仅包含合成 SDS-like 文件和演示法规片段。不要将 expected_findings 视为真实合规结论。"
+  },
+  "cases": [
+    {
+      "case_id": "golden_solvent_blend_complete",
+      "title": "完整溶剂混合物 CN/EU/US 预审",
+      "material_type": "mixture",
+      "target_markets": ["CN", "EU", "US"],
+      "intended_use": "金属部件工业清洗溶剂",
+      "document_path": "documents/solvent_blend_complete_sds.txt",
+      "knowledge_pack": "demo_regulatory_pack",
+      "scenario_tags": ["happy_path", "flammable_liquid", "cas_extraction", "multi_jurisdiction"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "sds_16_section_structure", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "GLOBAL", "issue_type": "composition_extracted", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "CN", "issue_type": "regulated_substance_match", "severity": "high", "requires_human_review": true},
+        {"jurisdiction": "EU", "issue_type": "source_backed_no_svhc_demo_match", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "US", "issue_type": "tsca_inventory_match", "severity": "medium", "requires_human_review": true}
+      ]
+    },
+    {
+      "case_id": "golden_bpa_article_eu_svhc",
+      "title": "含双酚A的聚碳酸酯物品欧盟 SVHC 阈值信号",
+      "material_type": "article",
+      "target_markets": ["EU"],
+      "intended_use": "作为物品供应的模塑透明部件",
+      "document_path": "documents/bpa_article_supplier_declaration.txt",
+      "knowledge_pack": "demo_regulatory_pack",
+      "scenario_tags": ["article", "svhc", "threshold", "eu_only"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "composition_extracted", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "EU", "issue_type": "svhc_threshold_match", "severity": "high", "requires_human_review": true}
+      ]
+    },
+    {
+      "case_id": "golden_incomplete_sds_missing_sections",
+      "title": "缺少后续章节的不完整胶黏剂 SDS",
+      "material_type": "mixture",
+      "target_markets": ["CN", "EU", "US"],
+      "intended_use": "临时装配用工业胶黏剂",
+      "document_path": "documents/incomplete_adhesive_sds.txt",
+      "knowledge_pack": "empty",
+      "scenario_tags": ["negative_path", "missing_sections", "no_regulatory_knowledge"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "sds_missing_sections", "severity": "medium", "requires_human_review": true},
+        {"jurisdiction": "GLOBAL", "issue_type": "composition_extracted", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "CN", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true}
+      ]
+    },
+    {
+      "case_id": "golden_confidential_blend_no_cas",
+      "title": "未披露 CAS 成分的保密混合物",
+      "material_type": "mixture",
+      "target_markets": ["CN", "EU", "US"],
+      "intended_use": "聚合物加工用添加剂母料",
+      "document_path": "documents/confidential_blend_no_cas_sds.txt",
+      "knowledge_pack": "demo_regulatory_pack",
+      "scenario_tags": ["supplier_gap", "missing_cas", "composition_gap"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "composition_not_extracted", "severity": "review", "requires_human_review": true},
+        {"jurisdiction": "CN", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true},
+        {"jurisdiction": "US", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true}
+      ]
+    },
+    {
+      "case_id": "golden_ethanol_us_tsca",
+      "title": "高纯乙醇美国 TSCA/HCS 预审",
+      "material_type": "substance",
+      "target_markets": ["US"],
+      "intended_use": "实验室溶剂和生产清洗剂",
+      "document_path": "documents/ethanol_substance_us_sds.txt",
+      "knowledge_pack": "demo_regulatory_pack",
+      "scenario_tags": ["substance", "us_only", "tsca", "flammable_liquid"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "sds_16_section_structure", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "US", "issue_type": "tsca_inventory_match", "severity": "medium", "requires_human_review": true}
+      ]
+    },
+    {
+      "case_id": "golden_unknown_research_intermediate",
+      "title": "无来源支撑命中的未知研发中间体",
+      "material_type": "substance",
+      "target_markets": ["CN", "EU", "US"],
+      "intended_use": "中试合成用研发中间体",
+      "document_path": "documents/unknown_research_intermediate_sds.txt",
+      "knowledge_pack": "demo_regulatory_pack",
+      "scenario_tags": ["unknown_cas", "conservative_no_match", "human_review"],
+      "expected_findings": [
+        {"jurisdiction": "GLOBAL", "issue_type": "composition_extracted", "severity": "info", "requires_human_review": true},
+        {"jurisdiction": "CN", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true},
+        {"jurisdiction": "EU", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true},
+        {"jurisdiction": "US", "issue_type": "insufficient_regulatory_evidence", "severity": "review", "requires_human_review": true}
+      ]
+    }
+  ]
+}

@@ -73,6 +73,34 @@
       "effective_date": "2026-05-01",
       "retrieved_at": "2026-05-09",
       "license_note": "合成企业内部演示规则。生产环境应由企业 EHS、法规和业务负责人批准后导入。"
+    },
+    {
+      "filename": "gb_30981_voc_limits.md",
+      "title": "GB 30981-2020 / CARB SCAQMD 工业涂料 VOC 限值审查源文档摘要",
+      "jurisdiction": "CN",
+      "source_type": "official_standard_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "voc_limit_screening",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=GB30981-2020",
+      "version": "GB-30981-2020-with-CARB-Rule-1113-2024-demo",
+      "effective_date": "2020-12-01",
+      "retrieved_at": "2026-05-09",
+      "license_note": "公开标准摘要，用于演示 VOC 限值核查。生产环境应核对 GB 30981-2020 / CARB SCAQMD Rule 1113 当前版本与企业产品类别。"
+    },
+    {
+      "filename": "ghs_clp_label_pictogram.md",
+      "title": "GHS / CLP / GB 30000.2 标签与象形图审查源文档摘要",
+      "jurisdiction": "GLOBAL",
+      "source_type": "official_standard_summary",
+      "source_origin": "official",
+      "quality_tier": "official",
+      "document_role": "ghs_label_screening",
+      "source_url": "https://unece.org/transport/dangerous-goods/ghs-rev10-2023",
+      "version": "GHS-Rev10-2023 / CLP-EC-1272-2008 / GB-30000.2-2013-demo",
+      "effective_date": "2023-07-01",
+      "retrieved_at": "2026-05-09",
+      "license_note": "公开 UN GHS / EU CLP / GB 30000.2 标准摘要，仅供 Demo RAG 检索使用。"
     }
   ]
 }

@@ -1,0 +1,40 @@
+<!-- admin-trace.html — 模板片段，仅 .main 内的结构（HANDOFF #4e §3）。
+     由 index.js fetch 注入到 #route-outlet；不要直接打开此文件作为页面。 -->
+<div class="trc-hd">
+  <div class="trc-hd-row">
+    <div>
+      <div class="trc-cap" data-trc="meta-cap">加载中…</div>
+      <div class="trc-ttl" data-trc="title">审查回放</div>
+      <div class="trc-sub" data-trc="meta-sub"></div>
+    </div>
+    <div class="trc-hd-acts">
+      <button class="cta-pearl" type="button" data-trc="export">导出 trace JSON</button>
+      <button class="cta-pearl" type="button" data-trc="back">返回客户视图</button>
+    </div>
+  </div>
+  <div class="trc-chips" data-trc="chips"></div>
+</div>
+
+<div data-trc="error-slot"></div>
+
+<div class="trc-layout" data-trc="layout" hidden>
+  <aside class="trc-tl">
+    <h6>10 节点 · 回放</h6>
+    <div data-trc="timeline"></div>
+  </aside>
+  <section class="trc-detail" data-trc="detail">
+    <div class="ttl" data-trc="detail-ttl">节点详情</div>
+    <div class="sub" data-trc="detail-sub"></div>
+    <div data-trc="panels"></div>
+  </section>
+</div>
+
+<div class="trc-empty" data-trc="empty" hidden>
+  <div class="trc-empty-inner">
+    <div class="trc-empty-ttl">该 Case 暂无 trace 数据</div>
+    <div class="trc-empty-h" data-trc="empty-h">latest_report 缺失或未生成 nodes。</div>
+    <div class="trc-empty-acts">
+      <button class="cta-pearl" type="button" data-trc="back-2">返回客户视图</button>
+    </div>
+  </div>
+</div>

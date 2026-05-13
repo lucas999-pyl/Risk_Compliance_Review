@@ -1,0 +1,35 @@
+/* Design tokens — 来源 docs/UI_v01/_build/core.css :root + DESIGN.md
+   只放颜色、字体；字号 / 圆角 / 间距由各页 CSS 自管。 */
+:root {
+  /* primary */
+  --primary: #0066cc;
+  --primary-focus: #0071e3;
+  --primary-on-dark: #2997ff;
+
+  /* ink 灰阶 */
+  --ink: #1d1d1f;
+  --ink-80: #333333;
+  --ink-48: #7a7a7a;
+  --mute: #8e8e93;
+
+  /* divider */
+  --hairline: #e0e0e0;
+  --divider-soft: #f0f0f0;
+
+  /* surface */
+  --canvas: #ffffff;
+  --parchment: #f5f5f7;
+  --pearl: #fafafc;
+  --tile-dark: #272729;
+  --black: #000000;
+
+  /* status (4 个) */
+  --pass: #34c759;
+  --warn: #ff9500;
+  --block: #ff3b30;
+  --mute-status: #8e8e93;
+
+  /* fonts — 中文优先 PingFang SC，英文走 SF Pro */
+  --font-display: "PingFang SC", "SF Pro Display", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-text: "PingFang SC", "SF Pro Text", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}

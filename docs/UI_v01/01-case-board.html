@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>01 · Case 看板</title>
+<style>
+  :root{
+    --primary:#0066cc;
+    --primary-focus:#0071e3;
+    --ink:#1d1d1f;
+    --ink-80:#333;
+    --ink-48:#7a7a7a;
+    --mute:#8e8e93;
+    --hairline:#e0e0e0;
+    --divider-soft:#f0f0f0;
+    --canvas:#fff;
+    --parchment:#f5f5f7;
+    --pearl:#fafafc;
+    --tile-dark:#272729;
+    --black:#000;
+    --pass:#34c759;
+    --warn:#ff9500;
+    --block:#ff3b30;
+    --font-display:"PingFang SC","SF Pro Display",system-ui,-apple-system,sans-serif;
+    --font-text:"PingFang SC","SF Pro Text",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:var(--font-text);
+    font-size:16px;
+    line-height:1.6;
+    color:var(--ink);
+    background:var(--parchment);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ============ caption banner（屏外） ============ */
+  .caption{
+    width:1440px;
+    margin:0 auto;
+    padding:20px 32px;
+    background:var(--ink);
+    color:#fff;
+    display:grid;
+    grid-template-columns:1fr auto auto auto;
+    gap:32px;
+    align-items:baseline;
+    font-size:13px;
+    line-height:1.4;
+    letter-spacing:-0.08px;
+  }
+  .caption .name{font-weight:600;font-size:14px;}
+  .caption .meta{color:#cccccc;}
+  .caption .meta b{color:#fff;font-weight:600;margin-right:6px;}
+
+  /* ============ artboard ============ */
+  .frame{
+    width:1440px;
+    margin:0 auto;
+    background:var(--canvas);
+    display:grid;
+    grid-template-columns:240px 1fr;
+    grid-template-rows:44px auto;
+    grid-template-areas:
+      "nav nav"
+      "side main";
+    min-height:900px;
+  }
+
+  /* ============ global nav ============ */
+  .gnav{
+    grid-area:nav;
+    background:var(--black);
+    color:#fff;
+    height:44px;
+    display:flex;
+    align-items:center;
+    padding:0 24px;
+    gap:24px;
+    font-size:12px;
+    letter-spacing:-0.12px;
+  }
+  .gnav .brand{font-weight:600;letter-spacing:-0.224px;font-size:13px;}
+  .gnav .crumb{color:#cccccc;}
+  .gnav .crumb b{color:#fff;font-weight:400;}
+  .gnav .spacer{flex:1;}
+  .gnav .switch{
+    display:flex;
+    background:rgba(255,255,255,0.08);
+    border-radius:9999px;
+    padding:3px;
+    gap:0;
+  }
+  .gnav .switch button{
+    background:transparent;
+    color:#cccccc;
+    border:none;
+    font:inherit;
+    font-family:var(--font-text);
+    padding:5px 14px;
+    border-radius:9999px;
+    cursor:pointer;
+    letter-spacing:-0.12px;
+  }
+  .gnav .switch button.on{
+    background:var(--canvas);
+    color:var(--ink);
+  }
+  .gnav .me{color:#cccccc;}
+
+  /* ============ Case 列表 ============ */
+  .side{
+    grid-area:side;
+    background:var(--pearl);
+    border-right:1px solid var(--divider-soft);
+    padding:24px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .side h6{
+    font-size:12px;
+    font-weight:400;
+    letter-spacing:-0.12px;
+    color:var(--ink-48);
+    text-transform:uppercase;
+    padding:0 12px 8px;
+  }
+  .case-item{
+    padding:12px;
+    border-radius:8px;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .case-item.active{background:var(--canvas);}
+  .case-item .title{
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:-0.224px;
+    color:var(--ink);
+    line-height:1.4;
+  }
+  .case-item .sub{
+    font-size:12px;
+    color:var(--ink-48);
+    letter-spacing:-0.12px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .dot{
+    width:6px;height:6px;border-radius:50%;display:inline-block;flex:none;
+  }
+  .dot.pass{background:var(--pass);}
+  .dot.warn{background:var(--warn);}
+  .dot.block{background:var(--block);}
+  .dot.mute{background:var(--mute);}
+
+  /* ============ main ============ */
+  .main{
+    grid-area:main;
+    padding:0;
+    background:var(--canvas);
+  }
+  .hd{
+    padding:48px 64px 32px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:32px;
+  }
+  .hd h1{
+    font-family:var(--font-display);
+    font-size:48px;
+    font-weight:600;
+    line-height:1.07;
+    letter-spacing:-0.5px;
+    color:var(--ink);
+  }
+  .hd .lead{
+    font-size:17px;
+    color:var(--ink-48);
+    line-height:1.4;
+    margin-top:12px;
+    letter-spacing:-0.374px;
+  }
+  /* primary CTA - pill */
+  .cta-primary{
+    background:var(--primary);
+    color:#fff;
+    border:none;
+    font-family:var(--font-text);
+    font-size:16px;
+    letter-spacing:-0.374px;
+    padding:11px 22px;
+    border-radius:9999px;
+    cursor:pointer;
+    line-height:1.24;
+    white-space:nowrap;
+  }
+  .cta-primary:active{transform:scale(0.97);}
+
+  /* sub bar */
+  .subbar{
+    padding:16px 64px;
+    background:var(--parchment);
+    display:flex;
+    align-items:center;
+    gap:24px;
+    font-size:14px;
+    color:var(--ink-80);
+    letter-spacing:-0.224px;
+  }
+  .subbar .seg{
+    display:flex;
+    gap:0;
+    background:rgba(0,0,0,0.04);
+    border-radius:8px;
+    padding:3px;
+  }
+  .subbar .seg button{
+    background:transparent;border:none;font:inherit;
+    font-family:var(--font-text);
+    padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--ink-80);
+    letter-spacing:-0.224px;
+  }
+  .subbar .seg button.on{background:var(--canvas);color:var(--ink);font-weight:600;}
+  .subbar .count{color:var(--ink-48);}
+  .subbar .count b{color:var(--ink);font-weight:600;}
+  .subbar .spacer{flex:1;}
+  .subbar input{
+    height:36px;
+    background:var(--canvas);
+    border:1px solid var(--hairline);
+    border-radius:9999px;
+    padding:0 16px;
+    font:inherit;
+    font-family:var(--font-text);
+    font-size:14px;
+    color:var(--ink);
+    width:240px;
+    letter-spacing:-0.224px;
+  }
+
+  /* grid */
+  .grid{
+    padding:32px 64px 80px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+  }
+
+  .card{
+    background:var(--canvas);
+    border:1px solid var(--hairline);
+    border-radius:18px;
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    cursor:pointer;
+  }
+  .card .cap{
+    font-size:13px;
+    color:var(--ink-48);
+    letter-spacing:-0.12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .card h3{
+    font-size:18px;
+    font-weight:600;
+    line-height:1.3;
+    letter-spacing:-0.374px;
+    color:var(--ink);
+    margin-top:4px;
+  }
+  .card .meta{
+    font-size:13px;
+    color:var(--ink-48);
+    letter-spacing:-0.12px;
+  }
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:8px;
+  }
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    height:26px;
+    padding:0 10px;
+    background:var(--parchment);
+    border-radius:9999px;
+    font-size:12px;
+    color:var(--ink-80);
+    letter-spacing:-0.12px;
+    line-height:1;
+  }
+  .chip.strong{background:var(--canvas);border:1px solid var(--hairline);}
+  .card .foot{
+    margin-top:auto;
+    padding-top:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-top:1px solid var(--divider-soft);
+  }
+  .card .status{
+    font-size:13px;
+    color:var(--ink-48);
+    letter-spacing:-0.12px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .card .link{
+    color:var(--primary);
+    font-size:14px;
+    text-decoration:none;
+    letter-spacing:-0.224px;
+  }
+
+  /* 空态 case */
+  .card.empty{
+    background:var(--parchment);
+    border:1px dashed var(--hairline);
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    min-height:240px;
+    padding:40px;
+    cursor:pointer;
+  }
+  .card.empty .big{
+    font-size:34px;
+    font-weight:300;
+    color:var(--ink-48);
+    line-height:1;
+    letter-spacing:-0.374px;
+  }
+  .card.empty .lab{
+    font-size:14px;color:var(--ink-48);margin-top:12px;letter-spacing:-0.224px;
+  }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <div><div class="name">01 · Case 看板（/cases · 首页）</div><div style="color:#999;margin-top:4px;">3 列卡片网格 + 空 Case 占位；左侧 Case 列表选中首项</div></div>
+  <div class="meta"><b>tokens</b> canvas / pearl / hairline / status-* / primary</div>
+  <div class="meta"><b>尺寸</b> 1440 × 900 · 卡 lg-18 · padding 24</div>
+  <div class="meta"><b>状态</b> 默认 + 末位空态</div>
+</div>
+
+<div class="frame">
+  <!-- global nav -->
+  <nav class="gnav">
+    <div class="brand">化工合规预审</div>
+    <div class="crumb">·&nbsp;&nbsp;<b>Case 看板</b></div>
+    <div class="spacer"></div>
+    <div class="switch">
+      <button class="on">客户预审视角</button>
+      <button>管理端视角</button>
+    </div>
+    <div class="me">徐钰</div>
+  </nav>
+
+  <!-- 左侧 Case 列表 -->
+  <aside class="side">
+    <h6>Case · 6</h6>
+    <div class="case-item active">
+      <div class="title">某丙烯酸酯涂料 · 出口欧盟登记</div>
+      <div class="sub"><span class="dot warn"></span>需复核 · CASE-2026-0142</div>
+    </div>
+    <div class="case-item">
+      <div class="title">水性环氧地坪 SDS 复核</div>
+      <div class="sub"><span class="dot pass"></span>已完成 · CASE-2026-0141</div>
+    </div>
+    <div class="case-item">
+      <div class="title">含氟表面活性剂 · 配方合规</div>
+      <div class="sub"><span class="dot warn"></span>Step 4 · CASE-2026-0140</div>
+    </div>
+    <div class="case-item">
+      <div class="title">某粉末涂料原料替换</div>
+      <div class="sub"><span class="dot block"></span>缺件待补 · CASE-2026-0139</div>
+    </div>
+    <div class="case-item">
+      <div class="title">车用聚氨酯涂料 · 美国市场</div>
+      <div class="sub"><span class="dot pass"></span>已完成 · CASE-2026-0138</div>
+    </div>
+    <div class="case-item">
+      <div class="title">2K 木器漆 · 国内备案</div>
+      <div class="sub"><span class="dot mute"></span>Step 2 · CASE-2026-0137</div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <div class="hd">
+      <div>
+        <h1>Case 看板</h1>
+        <div class="lead">6 个进行中 · 2 待你处理</div>
+      </div>
+      <button class="cta-primary">新建 Case</button>
+    </div>
+
+    <div class="subbar">
+      <div class="seg">
+        <button class="on">全部</button>
+        <button>进行中</button>
+        <button>已完成</button>
+        <button>待重跑</button>
+      </div>
+      <div class="count"><b>6</b> Case · <b>2</b> 待办</div>
+      <div class="spacer"></div>
+      <input placeholder="搜索案件标题 / 编号" />
+    </div>
+
+    <div class="grid">
+      <!-- card 1 · 报告就绪 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0142</span><span>创建于 05-09</span></div>
+        <h3>某丙烯酸酯涂料 · 出口欧盟登记</h3>
+        <div class="meta">市场准入审查 · 目标市场 EU</div>
+        <div class="chips">
+          <span class="chip"><span class="dot pass"></span>已识别 3</span>
+          <span class="chip"><span class="dot mute"></span>需补 0</span>
+          <span class="chip"><span class="dot pass"></span>可查 6</span>
+          <span class="chip"><span class="dot block"></span>阻断 1</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot warn"></span>需复核 · 报告就绪</div>
+          <a class="link" href="#">查看报告 →</a>
+        </div>
+      </div>
+
+      <!-- card 2 · 已完成 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0141</span><span>创建于 05-07</span></div>
+        <h3>水性环氧地坪 SDS 复核</h3>
+        <div class="meta">SDS 复核 · 目标市场 CN</div>
+        <div class="chips">
+          <span class="chip"><span class="dot pass"></span>已识别 4</span>
+          <span class="chip"><span class="dot mute"></span>需补 0</span>
+          <span class="chip"><span class="dot pass"></span>可查 12</span>
+          <span class="chip"><span class="dot mute"></span>阻断 0</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot pass"></span>可审 · 已完成</div>
+          <a class="link" href="#">查看报告 →</a>
+        </div>
+      </div>
+
+      <!-- card 3 · 进行中 step 4 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0140</span><span>创建于 05-06</span></div>
+        <h3>含氟表面活性剂 · 配方合规</h3>
+        <div class="meta">配方合规 · 目标市场 EU · US</div>
+        <div class="chips">
+          <span class="chip"><span class="dot pass"></span>已识别 2</span>
+          <span class="chip"><span class="dot warn"></span>需补 1</span>
+          <span class="chip"><span class="dot pass"></span>可查 8</span>
+          <span class="chip"><span class="dot mute"></span>阻断 0</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot warn"></span>Step 4 · 调整审查范围</div>
+          <a class="link" href="#">继续 →</a>
+        </div>
+      </div>
+
+      <!-- card 4 · 阻断缺件 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0139</span><span>创建于 05-05</span></div>
+        <h3>某粉末涂料原料替换</h3>
+        <div class="meta">配方合规 · 目标市场 CN</div>
+        <div class="chips">
+          <span class="chip"><span class="dot pass"></span>已识别 2</span>
+          <span class="chip"><span class="dot block"></span>需补 3</span>
+          <span class="chip"><span class="dot mute"></span>可查 0</span>
+          <span class="chip"><span class="dot block"></span>阻断 4</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot block"></span>缺件 · 待补资料</div>
+          <a class="link" href="#">补件 →</a>
+        </div>
+      </div>
+
+      <!-- card 5 · 已完成 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0138</span><span>创建于 05-02</span></div>
+        <h3>车用聚氨酯涂料 · 美国市场</h3>
+        <div class="meta">市场准入审查 · 目标市场 US</div>
+        <div class="chips">
+          <span class="chip"><span class="dot pass"></span>已识别 5</span>
+          <span class="chip"><span class="dot mute"></span>需补 0</span>
+          <span class="chip"><span class="dot pass"></span>可查 14</span>
+          <span class="chip"><span class="dot mute"></span>阻断 0</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot pass"></span>可审 · 已完成</div>
+          <a class="link" href="#">查看报告 →</a>
+        </div>
+      </div>
+
+      <!-- card 6 · 早期 -->
+      <div class="card">
+        <div class="cap"><span>CASE-2026-0137</span><span>创建于 04-28</span></div>
+        <h3>2K 木器漆 · 国内备案</h3>
+        <div class="meta">市场准入审查 · 目标市场 CN</div>
+        <div class="chips">
+          <span class="chip"><span class="dot mute"></span>未识别</span>
+          <span class="chip"><span class="dot mute"></span>需补 —</span>
+          <span class="chip"><span class="dot mute"></span>可查 —</span>
+          <span class="chip"><span class="dot mute"></span>阻断 —</span>
+        </div>
+        <div class="foot">
+          <div class="status"><span class="dot mute"></span>Step 2 · 上传资料</div>
+          <a class="link" href="#">继续 →</a>
+        </div>
+      </div>
+
+      <!-- 空态占位 -->
+      <div class="card empty">
+        <div class="big">＋</div>
+        <div class="lab">新建一个 Case，从案件基本信息开始</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

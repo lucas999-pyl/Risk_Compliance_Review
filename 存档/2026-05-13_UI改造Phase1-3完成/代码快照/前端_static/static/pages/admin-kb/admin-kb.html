@@ -1,0 +1,105 @@
+<section class="adm-hd">
+  <div>
+    <h1>知识库工作台</h1>
+    <div class="lead">所有 Case 共享同一份规则库。在这里上传官方规则源 / 重新切块 / 重建向量；与具体 Case 无关。</div>
+  </div>
+  <div class="acts">
+    <button class="cta-primary" id="kb-upload-btn" type="button">上传知识源文档</button>
+    <button class="cta-pearl" id="kb-import-demo-btn" type="button">导入演示包</button>
+    <button class="cta-pearl" id="kb-download-pack-btn" type="button">下载源包 ZIP</button>
+    <button class="cta-dark" id="kb-clear-btn" type="button">清空知识库</button>
+  </div>
+</section>
+
+<div class="adm-body">
+  <div class="kb-mc-grid" id="kb-mc-grid">
+    <div class="kb-mc"><div class="lab">知识源 · 已上传<span class="pill" id="kb-mc-source-pill">--</span></div><div class="num" id="kb-mc-source">--</div><div class="desc" id="kb-mc-source-desc">加载中…</div></div>
+    <div class="kb-mc"><div class="lab">Chunk · 已切分<span class="pill" id="kb-mc-chunk-pill">--</span></div><div class="num" id="kb-mc-chunk">--</div><div class="desc" id="kb-mc-chunk-desc">加载中…</div></div>
+    <div class="kb-mc"><div class="lab">向量 · 已索引<span class="pill" id="kb-mc-vector-pill">--</span></div><div class="num" id="kb-mc-vector">--</div><div class="desc" id="kb-mc-vector-desc">加载中…</div></div>
+    <div class="kb-mc"><div class="lab">Embedding 模型<span class="pill" id="kb-mc-model-pill">--</span></div><div class="num kb-mc-model-num" id="kb-mc-model">--</div><div class="desc" id="kb-mc-model-desc">维度 / 提供方</div></div>
+  </div>
+
+  <div class="kb-empty-hint" id="kb-empty-hint" hidden>
+    当前知识库为空，可<a href="#" class="link" id="kb-hint-import-link">点此快速导入演示包</a>。
+  </div>
+
+  <section class="kb-section">
+    <div class="h-row">
+      <h2>检索预览</h2>
+      <div class="h-cap">输入自然语言 query，返回前 5 个 chunk · 用于验证向量索引是否健康</div>
+    </div>
+    <div class="kb-search">
+      <div class="kb-search-bar">
+        <input id="kb-search-input" type="text" placeholder="例如：水性涂料 VOC 限值是多少？" />
+        <div class="kb-search-markets">
+          <label><input type="checkbox" value="CN" checked> CN</label>
+          <label><input type="checkbox" value="EU" checked> EU</label>
+          <label><input type="checkbox" value="US" checked> US</label>
+        </div>
+        <button class="cta-primary" id="kb-search-btn" type="button">检索</button>
+      </div>
+      <div class="kb-search-results" id="kb-search-results"></div>
+    </div>
+  </section>
+
+  <section class="kb-section">
+    <div class="h-row">
+      <h2>已索引规则</h2>
+      <div class="h-cap" id="kb-rules-cap">加载中…</div>
+    </div>
+    <div class="kb-rules" id="kb-rules">
+      <div class="hd"><div>规则编号</div><div>名称</div><div>类型</div><div>Chunks</div><div>最近检索</div></div>
+      <div class="kb-rules-body" id="kb-rules-body">
+        <div class="kb-rules-loading">加载中…</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="kb-modal" id="kb-upload-modal" hidden>
+  <div class="kb-modal-card">
+    <div class="kb-modal-hd">
+      <div class="kb-modal-ttl">上传知识源文档</div>
+      <button class="kb-modal-x" id="kb-upload-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="kb-modal-body">
+      <div class="kb-uploads">
+        <div class="kb-dz">
+          <div class="t">Manifest · 总目录（YAML，单文件）</div>
+          <div class="h">一份 YAML 列出本批次包含的规则源、版本号、生效日期。</div>
+          <input type="file" id="kb-manifest-input" accept=".yaml,.yml,.txt" />
+          <div class="kb-dz-file" id="kb-manifest-file"></div>
+        </div>
+        <div class="kb-dz">
+          <div class="t">规则源文档（PDF / DOCX / HTML，多文件）</div>
+          <div class="h">官方法规原文 · 系统按章节切分后向量化。</div>
+          <input type="file" id="kb-source-input" multiple accept=".pdf,.docx,.html,.htm,.txt,.md" />
+          <div class="kb-dz-list" id="kb-source-list"></div>
+        </div>
+      </div>
+      <div class="kb-modal-msg" id="kb-upload-msg"></div>
+    </div>
+    <div class="kb-modal-ft">
+      <button class="cta-pearl" id="kb-upload-cancel" type="button">取消</button>
+      <button class="cta-primary" id="kb-upload-submit" type="button">开始上传</button>
+    </div>
+  </div>
+</div>
+
+<div class="kb-modal" id="kb-clear-modal" hidden>
+  <div class="kb-modal-card kb-modal-narrow">
+    <div class="kb-modal-hd">
+      <div class="kb-modal-ttl">清空知识库</div>
+      <button class="kb-modal-x" id="kb-clear-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="kb-modal-body">
+      <p class="kb-clear-warn">此操作会清空当前所有 chunk 与向量索引，无法撤销。如需继续，请在下方输入框输入 <b>CLEAR</b> 后再点击确认。</p>
+      <input type="text" id="kb-clear-confirm-input" placeholder="输入 CLEAR" autocomplete="off" />
+      <div class="kb-modal-msg" id="kb-clear-msg"></div>
+    </div>
+    <div class="kb-modal-ft">
+      <button class="cta-pearl" id="kb-clear-cancel" type="button">取消</button>
+      <button class="cta-dark" id="kb-clear-confirm-btn" type="button" disabled>确认清空</button>
+    </div>
+  </div>
+</div>

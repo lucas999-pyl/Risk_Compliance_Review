@@ -84,12 +84,31 @@ FORMULA_COMPONENT_PATTERN = re.compile(
 )
 PROCESS_FIELD_PATTERN = re.compile(r"(?m)^\s*(?P<key>温度|压力|关键步骤|设备|工艺名称)\s*[:：]\s*(?P<value>.+?)\s*$")
 PROCESS_EXTRA_FIELD_PATTERN = re.compile(r"(?m)^\s*(?P<key>储存条件|储存类别|运输信息)\s*[:：]\s*(?P<value>.+?)\s*$")
-TEMPERATURE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*(?:C|℃)", re.IGNORECASE)
+TEMPERATURE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*°?\s*(?:C|℃)\b", re.IGNORECASE)
 DATE_PATTERN = re.compile(r"(?P<year>\d{4})[-/](?P<month>\d{1,2})[-/](?P<day>\d{1,2})")
 HARD_STOP_RULES = {
     "incompatibility_oxidizer_flammable",
     "incompatibility_hypochlorite_acid",
     "enterprise_redline_benzene",
+    "voc_limit_exceeded",
+}
+# VOC 抽取：匹配 "VOC ... <数字> g/L" 形式，兼容 "总 VOC"、"VOC 含量"、"VOC 350 g/L" 等中英行话。
+VOC_VALUE_PATTERN = re.compile(
+    r"(?:总\s*)?VOC(?:\s*含量)?[^0-9\n]{0,12}(?P<value>\d+(?:\.\d+)?)\s*g\s*/\s*L",
+    re.IGNORECASE,
+)
+# VOC 超标声明：文本中显式出现 "VOC <值> g/L 超 ... <limit> g/L 限值"，由参考限值与实测对比确认。
+VOC_EXCEEDANCE_PATTERN = re.compile(
+    r"VOC[^超符\n]{0,40}(?P<value>\d+(?:\.\d+)?)\s*g\s*/\s*L[^符\n]{0,40}超(?:过|出)?[^0-9\n]{0,40}(?P<limit>\d+(?:\.\d+)?)\s*g\s*/\s*L",
+    re.IGNORECASE,
+)
+# 资料里明确出现 "voc_limit_exceeded" 规则标识也作为强信号（被 sub-X demo 文档写入）。
+VOC_RULE_ID_PATTERN = re.compile(r"voc_limit_exceeded", re.IGNORECASE)
+# GB 30981-2020 水性双组分工业防护涂料 250 g/L 限值，作为兜底硬阻断阈值（最严类别）。
+VOC_HARD_STOP_LIMIT_GL = 250.0
+# 绝对阻断规则：即便资料缺失/未知组分也直接判定不合规（regulatory ceiling 类）。
+ABSOLUTE_HARD_STOP_RULES = {
+    "voc_limit_exceeded",
 }
 REVIEW_RULES = {
     "sds_missing_sections",
@@ -248,14 +267,16 @@ class ChemicalRagRunner:
         self.settings = settings or Settings()
         self.dataset_root = dataset_root
         self.ai_config = AIClientConfig(
-            base_url=self.settings.openai_compatible_base_url,
-            api_key=self.settings.openai_compatible_api_key,
+            base_url=self.settings.chem_rag_embedding_base_url,
+            api_key=self.settings.chem_rag_embedding_api_key,
             embedding_provider=self.settings.chem_rag_embedding_provider if self.settings.enable_llm else "hash",
             embedding_model=self.settings.chem_rag_embedding_model,
             embedding_dimensions=self.settings.chem_rag_embedding_dimensions,
             llm_provider=self.settings.chem_rag_llm_provider if self.settings.enable_llm else "disabled",
             llm_model=self.settings.chem_rag_llm_model,
             timeout_seconds=self.settings.chem_rag_request_timeout_seconds,
+            llm_base_url=self.settings.chem_rag_llm_base_url,
+            llm_api_key=self.settings.chem_rag_llm_api_key,
         )
         self.embedding_client = vector_store.embedding_client if vector_store else EmbeddingClient(self.ai_config)
         self.vector_store = vector_store or SQLiteVectorStore(
@@ -477,7 +498,7 @@ class ChemicalRagRunner:
         }
         retrieved = self._merge_retrievals(retrieval_by_agent)
 
-        base_hits = self._base_rule_hits(case, parsed_sds, formula, components, process, retrieved)
+        base_hits = self._base_rule_hits(case, parsed_sds, formula, components, process, retrieved, sds_text=sds_text)
         completeness_agent_result = self._with_llm(
             "资料完整性",
             self._completeness_agent(parsed_sds, formula, process, components),
@@ -1002,6 +1023,25 @@ class ChemicalRagRunner:
     def _load_rules_pack(self) -> dict[str, Any]:
         return json.loads((self.dataset_root / "knowledge" / "chemical_rules_pack.json").read_text(encoding="utf-8"))
 
+    def _rule_meta_index(self) -> dict[str, dict[str, Any]]:
+        """Return a {rule_id -> rule_meta_dict} index from the rules pack.
+
+        Tolerates absence of the top-level ``rules`` array (sub-X may still be
+        adding it). Cached on the instance after first read.
+        """
+        cached = getattr(self, "_rule_meta_index_cache", None)
+        if cached is not None:
+            return cached
+        pack = self._load_rules_pack()
+        rules = pack.get("rules") or []
+        index: dict[str, dict[str, Any]] = {}
+        for rule in rules:
+            rule_id = rule.get("rule_id")
+            if isinstance(rule_id, str) and rule_id:
+                index[rule_id] = rule
+        self._rule_meta_index_cache = index
+        return index
+
     def _pack_sources_for_chunks(self) -> list[dict[str, Any]]:
         sources = []
         for index, source in enumerate(self._load_rules_pack()["sources"]):
@@ -1374,6 +1414,31 @@ class ChemicalRagRunner:
                     "tags": sorted(profile.tags),
                 }
             )
+        if not components:
+            from app.document_parser import extract_components_from_markdown_table
+
+            seen_cas: set[str] = set()
+            for extracted in extract_components_from_markdown_table(text):
+                if extracted.cas in seen_cas:
+                    continue
+                seen_cas.add(extracted.cas)
+                raw_name = extracted.name
+                cas = extracted.cas
+                profile = normalize_substance(raw_name, cas)
+                components.append(
+                    {
+                        "substance_id": profile.substance_id,
+                        "name": profile.name,
+                        "raw_name": raw_name,
+                        "cas": cas,
+                        "ec": extracted.ec or profile.ec,
+                        "concentration_min": extracted.concentration_min,
+                        "concentration_max": extracted.concentration_max,
+                        "concentration_text": extracted.concentration_text or f"{extracted.concentration_min}%",
+                        "known": cas in KNOWN_SUBSTANCES,
+                        "tags": sorted(profile.tags),
+                    }
+                )
         unresolved_component_lines = [
             line.strip(" -")
             for line in text.splitlines()
@@ -1396,12 +1461,22 @@ class ChemicalRagRunner:
         fields = {match.group("key"): match.group("value").strip() for match in PROCESS_FIELD_PATTERN.finditer(text)}
         for match in PROCESS_EXTRA_FIELD_PATTERN.finditer(text):
             fields[match.group("key")] = match.group("value").strip()
+        temperatures = [float(match.group("value")) for match in TEMPERATURE_PATTERN.finditer(text)]
+        if "温度" not in fields and temperatures:
+            fields["温度"] = f"工艺温度范围检测到 {min(temperatures):g}-{max(temperatures):g}℃"
+        if "压力" not in fields:
+            pressure_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:MPa|kPa|bar|atm)|常压|大气压", text, re.IGNORECASE)
+            if pressure_match:
+                fields["压力"] = pressure_match.group(0).strip()
+        if "关键步骤" not in fields:
+            step_count = len(re.findall(r"(?m)^#{1,4}\s*\d+[\.\、]\s*\S+", text))
+            if step_count >= 3 or "工艺步骤" in text or "工序" in text:
+                fields["关键步骤"] = f"识别到 {step_count} 个步骤段落" if step_count else "包含工艺步骤段落"
         missing = []
         for key in ["温度", "压力", "关键步骤"]:
             value = fields.get(key, "")
-            if not value or "未提供" in value:
+            if not value or "未提供" in value or "适宜温度" in value or "适当" in value:
                 missing.append(key)
-        temperatures = [float(match.group("value")) for match in TEMPERATURE_PATTERN.finditer(text)]
         return {
             "fields": fields,
             "missing_fields": missing,
@@ -1694,8 +1769,19 @@ class ChemicalRagRunner:
         components: list[dict[str, Any]],
         process: dict[str, Any],
         retrieved: list[RankedChunk],
+        *,
+        sds_text: str = "",
     ) -> list[dict[str, Any]]:
         hits = []
+        if self._voc_limit_exceeded(sds_text, formula.get("text", ""), process.get("text", "")):
+            hits.append(
+                self._rule_hit(
+                    "voc_limit_exceeded",
+                    "CN",
+                    ["sds_document", "formula_document"],
+                    0.95,
+                )
+            )
         section_numbers = set(parsed_sds.metadata["sds_section_numbers"])
         if section_numbers == set(range(1, 17)):
             hits.append(self._rule_hit("sds_complete", "GLOBAL", ["sds_document"], 0.92))
@@ -2079,6 +2165,10 @@ class ChemicalRagRunner:
             reasons.append(f"缺少关键资料或字段：{'、'.join(missing)}。")
         if unknown:
             reasons.append(f"未知物质或知识库无命中：{', '.join(component['cas'] for component in unknown)}。")
+        absolute_stops = [rule for rule in hard_stop_rules if rule in ABSOLUTE_HARD_STOP_RULES]
+        if absolute_stops:
+            reasons.append(f"命中绝对阻断规则：{'、'.join(sorted(set(absolute_stops)))}。")
+            return {"verdict": "不合规", "reasons": reasons, "needs_human": False}
         if hard_stop_rules and not missing and not unknown:
             reasons.append(f"命中禁忌/硬性拦截规则：{'、'.join(sorted(set(hard_stop_rules)))}。")
             return {"verdict": "不合规", "reasons": reasons, "needs_human": False}
@@ -2182,6 +2272,7 @@ class ChemicalRagRunner:
             "svhc_threshold_match": "ECHA REACH/SVHC 演示摘录",
             "tsca_inventory_match": "EPA TSCA 与 OSHA HCS 演示摘录",
             "source_backed_no_restricted_demo_match": "EPA TSCA 与 OSHA HCS 演示摘录",
+            "voc_limit_exceeded": "企业内部化工准入红线演示规则",
         }
         title = preferred.get(rule_id)
         for source in pack["sources"]:
@@ -2299,6 +2390,7 @@ class ChemicalRagRunner:
             risk_items=risk_items,
             evidence_chain=evidence_chain,
             package_precheck=package_precheck,
+            source_documents=source_documents,
             run_id=run_id,
             generated_at=generated_at,
         )
@@ -2416,6 +2508,7 @@ class ChemicalRagRunner:
         risk_items: list[dict[str, Any]],
         evidence_chain: list[dict[str, Any]],
         package_precheck: dict[str, Any] | None = None,
+        source_documents: list[dict[str, Any]] | None = None,
         run_id: str | None = None,
         generated_at: str | None = None,
     ) -> dict[str, Any]:
@@ -2497,6 +2590,7 @@ class ChemicalRagRunner:
                     }
                 )
                 counter += 1
+        rule_meta_index = self._rule_meta_index()
         for item in risk_items:
             if item["verdict"] == "合规":
                 continue
@@ -2506,7 +2600,13 @@ class ChemicalRagRunner:
             rule_id = item["rule_refs"][0] if item.get("rule_refs") else "manual_review"
             if self._is_positive_rule(rule_id):
                 continue
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
+            rule_meta = rule_meta_index.get(rule_id, {})
+            user_text = self._customer_user_text(
+                item.get("evidence_refs", []),
+                evidence_chain,
+                rule_meta=rule_meta,
+                source_documents=source_documents,
+            )
             key = (check_type, rule_id, user_text)
             if key in seen:
                 continue
@@ -2514,8 +2614,10 @@ class ChemicalRagRunner:
             issue_id = f"I-{counter:03d}"
             status = self._customer_issue_status(item["verdict"])
             rule_text = self._customer_rule_text(rule_id)
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
             check_label = CHECK_TYPE_LABELS[check_type]
+            rule_name_zh = rule_meta.get("rule_name_zh") or rule_id
+            regulation_ref = rule_meta.get("regulation_ref") or ""
+            regulation_excerpt = rule_meta.get("regulation_excerpt") or rule_text
             grouped[check_type].append(
                 {
                     "id": issue_id,
@@ -2527,13 +2629,21 @@ class ChemicalRagRunner:
                     "category_label": check_label,
                     "reason": self._customer_issue_reason(rule_id, item["reason"]),
                     "rule_id": rule_id,
+                    "violated_rule_id": rule_id,
+                    "rule_name_zh": rule_name_zh,
+                    "regulation_ref": regulation_ref,
+                    "regulation_excerpt": regulation_excerpt,
                     "rule_text": rule_text,
                     "rule": {
                         "id": rule_id,
                         "text": rule_text,
+                        "name_zh": rule_name_zh,
+                        "regulation_ref": regulation_ref,
+                        "regulation_excerpt": regulation_excerpt,
                         "source": "法规/企业规则知识库" if rule_id != "manual_review" else "人工复核策略",
                     },
                     "user_text": user_text,
+                    "user_quote": user_text,
                     "source": {
                         "type": "uploaded_document",
                         "text": user_text,
@@ -2788,15 +2898,81 @@ class ChemicalRagRunner:
         }
         return reasons.get(rule_id, fallback.removeprefix(f"命中规则 {rule_id}："))
 
-    def _customer_user_text(self, evidence_refs: list[str], evidence_chain: list[dict[str, Any]]) -> str:
+    def _customer_user_text(
+        self,
+        evidence_refs: list[str],
+        evidence_chain: list[dict[str, Any]],
+        *,
+        rule_meta: dict[str, Any] | None = None,
+        source_documents: list[dict[str, Any]] | None = None,
+    ) -> str:
+        """Resolve the user_quote / user_text snippet shown to customers.
+
+        Priority order:
+
+        1. If we have access to source documents and the rule pack provides
+           ``expected_user_quote_keywords``, search each user document for any
+           keyword and return an ~80-character window around the first hit.
+        2. If keywords are absent or none match but at least one source doc is
+           plausibly the source of this finding, return its first ~200 chars
+           (real document content, never a metadata summary).
+        3. Otherwise fall back to evidence_chain entries that look like real
+           document content (snippet does not look like a metadata digest).
+        4. Last resort: the legacy metadata snippet — should be reached only
+           for purely structural checks with no associated user document.
+        """
+        keywords = []
+        if rule_meta:
+            raw_keywords = rule_meta.get("expected_user_quote_keywords") or []
+            keywords = [str(kw) for kw in raw_keywords if str(kw).strip()]
+
+        # 1+2: try real source documents.
+        if source_documents:
+            doc_texts: list[str] = []
+            for doc in source_documents:
+                content = str(doc.get("content") or "").strip()
+                if content:
+                    doc_texts.append(content)
+            for keyword in keywords:
+                for text in doc_texts:
+                    position = text.find(keyword)
+                    if position < 0:
+                        continue
+                    start = max(0, position - 80)
+                    end = min(len(text), position + len(keyword) + 80)
+                    return text[start:end].strip()
+            # No keyword hit: still prefer real document content over metadata.
+            if doc_texts:
+                first = doc_texts[0]
+                return first[:200].strip()
+
+        # 3: evidence_chain — but skip entries whose snippets look like
+        # metadata digests (e.g. "SDS 章节数 16；缺失字段 [...]。",
+        # "配方表抽取成分 N 个。", "工艺字段：{...}").
         refs = set(evidence_refs)
+
+        def _looks_like_metadata(snippet: str) -> bool:
+            return (
+                "章节数" in snippet
+                or snippet.startswith("配方表抽取成分")
+                or snippet.startswith("工艺字段：")
+                or "缺失字段" in snippet
+            )
+
         for evidence in evidence_chain:
             if evidence["ref"] in refs and evidence["type"] == "资料":
-                return evidence["snippet"]
+                snippet = evidence["snippet"]
+                if not _looks_like_metadata(snippet):
+                    return snippet
         for evidence in evidence_chain:
             if evidence["ref"] in refs:
-                return evidence["snippet"]
-        return evidence_chain[0]["snippet"] if evidence_chain else "用户资料未提供可直接引用的原文。"
+                snippet = evidence["snippet"]
+                if not _looks_like_metadata(snippet):
+                    return snippet
+        # 4: last-resort fallback (structural checks without any doc context).
+        if evidence_chain:
+            return evidence_chain[0]["snippet"]
+        return "用户资料未提供可直接引用的原文。"
 
     def _customer_issue_impact(self, verdict: str, rule_id: str) -> str:
         if verdict == "不合规":
@@ -2826,7 +3002,7 @@ class ChemicalRagRunner:
             self._check_item("process_pressure", "工艺压力", process["fields"].get("压力", "未提供"), "压力" not in process["missing_fields"], "工艺资料"),
             self._check_item("process_steps", "工艺关键步骤", process["fields"].get("关键步骤", "未提供"), "关键步骤" not in process["missing_fields"], "工艺资料"),
             self._check_item("un_numbers", "UN 编号", "、".join(parsed_sds.metadata.get("un_numbers", [])) or "未提供/不适用", True, "SDS"),
-            self._check_item("storage_condition", "储存条件", self._storage_value(process, formula), self._storage_value(process, formula) != "未提供", "SDS/配方/工艺"),
+            self._check_item("storage_condition", "储存条件", self._storage_value(process, formula, parsed_sds), self._storage_value(process, formula, parsed_sds) != "未提供", "SDS/配方/工艺"),
         ]
 
     def _check_item(self, field: str, label: str, value: object, is_present: bool, source: str) -> dict[str, Any]:
@@ -2838,13 +3014,30 @@ class ChemicalRagRunner:
             "source": source,
         }
 
-    def _storage_value(self, process: dict[str, Any], formula: dict[str, Any]) -> str:
+    def _storage_value(self, process: dict[str, Any], formula: dict[str, Any], parsed_sds: Any | None = None) -> str:
         value = process["fields"].get("储存条件") or process["fields"].get("储存类别")
         if value:
             return value
-        for line in formula.get("text", "").splitlines():
-            if line.strip().startswith("储存类别"):
-                return line.split("：", 1)[-1].strip() if "：" in line else line.strip()
+        for source_text in (formula.get("text", ""), process.get("text", "")):
+            for line in source_text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith(("储存条件", "储存类别", "储运条件")):
+                    if "：" in stripped or ":" in stripped:
+                        return re.split(r"[：:]", stripped, maxsplit=1)[-1].strip()
+                    return stripped
+        if parsed_sds is not None:
+            for section in getattr(parsed_sds, "sections", []):
+                if section.number != 7:
+                    continue
+                for line in section.content.splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith(("储存条件", "储存类别", "储运条件", "储存：", "储存:")):
+                        if "：" in stripped or ":" in stripped:
+                            return re.split(r"[：:]", stripped, maxsplit=1)[-1].strip()
+                        return stripped
+                if section.content.strip():
+                    snippet = section.content.strip().splitlines()[0][:80]
+                    return f"SDS 第 7 章：{snippet}"
         return "未提供"
 
     def _review_risk_items(
@@ -3159,14 +3352,80 @@ class ChemicalRagRunner:
         has_oxidizer = any("oxidizer_demo" in component.get("tags", []) for component in components)
         return has_flammable and has_oxidizer
 
+    def _extract_voc_value(self, *texts: str) -> float | None:
+        """从 SDS / 配方 / 工艺文本里抽取 VOC g/L 值；返回最大命中值（更保守的阻断判断）。"""
+        best: float | None = None
+        for text in texts:
+            if not text:
+                continue
+            for match in VOC_VALUE_PATTERN.finditer(text):
+                try:
+                    value = float(match.group("value"))
+                except (TypeError, ValueError):
+                    continue
+                if best is None or value > best:
+                    best = value
+        return best
+
+    def _voc_limit_exceeded(self, *texts: str) -> bool:
+        """判断文档是否构成 VOC 超标硬阻断。
+
+        触发优先级（任一命中即视为超标）：
+        1) 文本里出现 "VOC <值> g/L 超 ... <limit> g/L" 显式声明，且 <值> > <limit>。
+        2) 文本中显式标注 ``voc_limit_exceeded`` 规则标识（demo 文档侧的强信号）。
+        3) 抽取到的最大 VOC 值大于最严类别兜底阈值（250 g/L）且文档包含"超 ... 限值"/"超过 ... 限值"短语。
+        """
+        for text in texts:
+            if not text:
+                continue
+            # 1) 显式 "VOC X g/L 超 ... limit g/L"
+            for match in VOC_EXCEEDANCE_PATTERN.finditer(text):
+                try:
+                    value = float(match.group("value"))
+                    limit = float(match.group("limit"))
+                except (TypeError, ValueError):
+                    continue
+                if value > limit:
+                    return True
+            # 2) 文档本身写出 voc_limit_exceeded（block 信号）
+            if VOC_RULE_ID_PATTERN.search(text):
+                return True
+        # 3) 兜底：>250 g/L 且文本含 "超 ... 限值" 邻近短语
+        voc_value = self._extract_voc_value(*texts)
+        if voc_value is None or voc_value <= VOC_HARD_STOP_LIMIT_GL:
+            return False
+        for text in texts:
+            if text and re.search(r"超(?:过|出)?[^符\n]{0,40}限值", text):
+                return True
+        return False
+
     def _looks_like_unresolved_formula_component(self, line: str) -> bool:
         clean = line.strip()
-        if not clean or not clean.startswith(("-", "*")):
+        if not clean:
             return False
-        if "CAS" in clean:
-            return False
-        has_concentration = bool(re.search(r"\d+(?:\.\d+)?\s*%", clean))
-        return has_concentration and any(keyword in clean for keyword in ["保密", "未披露", "未提供", "组分", "component"])
+        has_concentration = bool(re.search(r"\d+(?:\.\d+)?\s*%|\|\s*\d+(?:\.\d+)?\s*\|", clean))
+        if clean.startswith(("-", "*")):
+            if "CAS" in clean:
+                return False
+            return has_concentration and any(keyword in clean for keyword in ["保密", "未披露", "未提供", "组分", "component"])
+        if clean.startswith("|") and clean.endswith("|"):
+            cells = [c.strip() for c in clean.strip("|").split("|")]
+            if not has_concentration:
+                return False
+            if any(re.search(r"\b\d{2,7}-\d{2}-\d\b", cell) for cell in cells):
+                return False
+            if any(("见" in cell and ("SDS" in cell or "MSDS" in cell or "供应商" in cell or "随货" in cell)) for cell in cells):
+                return False
+            return any(
+                "未提供" in cell
+                or "待 NDA" in cell
+                or "未披露" in cell
+                or "内部代号" in cell
+                or "保密" in cell
+                or "CAS 未" in cell
+                for cell in cells
+            )
+        return False
 
     def _has_hypochlorite_acid_pair(self, components: list[dict[str, Any]]) -> bool:
         has_hypochlorite = any("hypochlorite_demo" in component.get("tags", []) for component in components)

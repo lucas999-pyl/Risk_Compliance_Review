@@ -1,0 +1,316 @@
+/* admin-trace.css — Phase 2e / #/admin/cases/:id/trace 专属样式。
+   `.dot` / `.chip` / `.cta-pearl` / `.case-item` 已在 shell.css，本文件不重复定义。
+   参考 docs/UI_v01/11-admin-trace.html 的 trc-* / topk-row 命名。 */
+
+/* —— 顶部元信息条 —— */
+.trc-hd {
+  padding: 32px 40px 0;
+  background: var(--parchment);
+  border-bottom: 1px solid var(--divider-soft);
+}
+.trc-hd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+}
+.trc-hd .trc-cap {
+  font-size: 12px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+}
+.trc-hd .trc-ttl {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+  margin-top: 6px;
+  line-height: 1.1;
+}
+.trc-hd .trc-sub {
+  font-size: 14px;
+  color: var(--ink-48);
+  margin-top: 4px;
+  letter-spacing: -0.224px;
+}
+.trc-hd-acts {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 24px;
+  flex-wrap: wrap;
+}
+.trc-chips {
+  margin-top: 24px;
+  display: flex;
+  gap: 8px;
+  padding-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+/* —— 主体两栏 —— */
+.trc-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 760px;
+}
+
+/* —— 左栏时间线 —— */
+.trc-tl {
+  padding: 32px 24px;
+  background: var(--pearl);
+  border-right: 1px solid var(--divider-soft);
+}
+.trc-tl h6 {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-48);
+  text-transform: uppercase;
+  letter-spacing: -0.12px;
+  margin-bottom: 18px;
+}
+.trc-node {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  align-items: flex-start;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-family: var(--font-text);
+  color: inherit;
+}
+.trc-node .stem {
+  position: relative;
+  width: 18px;
+  height: 100%;
+  padding-top: 6px;
+}
+.trc-node .stem .dot {
+  position: relative;
+  z-index: 2;
+}
+.trc-node .stem::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 5.5px;
+  bottom: -14px;
+  width: 1px;
+  background: var(--divider-soft);
+}
+.trc-node:last-child .stem::after { display: none; }
+.trc-node.active { background: var(--canvas); }
+.trc-node:hover:not(.active) { background: rgba(0, 0, 0, 0.02); }
+.trc-node .nm {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.224px;
+  line-height: 1.4;
+}
+.trc-node.active .nm { color: var(--primary); }
+.trc-node .meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  gap: 8px;
+}
+.trc-node .meta .meta-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trc-node .meta .meta-r {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— spinner（用于 running 状态外圈） —— */
+.spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--warn);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: trc-sp 0.8s linear infinite;
+  vertical-align: middle;
+}
+@keyframes trc-sp { to { transform: rotate(360deg); } }
+
+/* —— 右栏节点详情 —— */
+.trc-detail {
+  padding: 32px 40px;
+}
+.trc-detail .ttl {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+.trc-detail .sub {
+  font-size: 14px;
+  color: var(--ink-48);
+  margin-top: 8px;
+  letter-spacing: -0.224px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.trc-detail .sub span + span::before {
+  content: "·";
+  margin-right: 14px;
+  color: var(--mute);
+}
+
+/* —— 折叠面板 —— */
+.trc-panel {
+  margin-top: 24px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.trc-panel summary {
+  padding: 18px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  letter-spacing: -0.224px;
+  border-bottom: 1px solid transparent;
+  gap: 16px;
+}
+.trc-panel[open] summary { border-bottom-color: var(--divider-soft); }
+.trc-panel summary::-webkit-details-marker { display: none; }
+.trc-panel summary::marker { content: ""; }
+.trc-panel summary .ind {
+  color: var(--ink-48);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: -0.12px;
+  flex: none;
+}
+.trc-panel summary .arrow {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-48);
+  border-bottom: 1.5px solid var(--ink-48);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  margin-left: 8px;
+}
+.trc-panel[open] summary .arrow { transform: rotate(45deg); }
+.trc-panel .pbody {
+  padding: 18px 24px 22px;
+  font-size: 14px;
+  color: var(--ink-80);
+  line-height: 1.6;
+  letter-spacing: -0.224px;
+}
+.trc-panel .pbody.mute { color: var(--ink-48); }
+.trc-panel pre {
+  background: var(--parchment);
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-family: "SF Mono", "PingFang SC", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-80);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 360px;
+}
+
+/* —— TopK 行 —— */
+.topk-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 120px 90px 90px;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider-soft);
+  align-items: center;
+  font-size: 13px;
+  letter-spacing: -0.12px;
+}
+.topk-row:last-child { border-bottom: none; }
+.topk-row .rk {
+  font-weight: 600;
+  color: var(--ink-48);
+  font-variant-numeric: tabular-nums;
+}
+.topk-row .nm { color: var(--ink); }
+.topk-row .nm small {
+  display: block;
+  color: var(--ink-48);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.topk-row .sc {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-align: right;
+}
+.topk-row .sc small { color: var(--ink-48); }
+
+/* —— 错误条 —— */
+.trc-error {
+  margin: 16px 40px;
+  padding: 14px 18px;
+  background: rgba(255, 59, 48, 0.06);
+  border: 1px solid rgba(255, 59, 48, 0.32);
+  border-radius: 8px;
+  color: var(--block);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+
+/* —— 空态 —— */
+.trc-empty {
+  padding: 96px 40px;
+  display: flex;
+  justify-content: center;
+}
+.trc-empty-inner {
+  max-width: 480px;
+  text-align: center;
+}
+.trc-empty-ttl {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.374px;
+  line-height: 1.2;
+}
+.trc-empty-h {
+  font-size: 14px;
+  color: var(--ink-48);
+  margin-top: 10px;
+  letter-spacing: -0.224px;
+}
+.trc-empty-acts {
+  margin-top: 24px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}

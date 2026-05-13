@@ -1,7 +1,8 @@
 {
   "pack_id": "chemical_rules_pack",
-  "version": "2026-05-demo-expanded",
+  "version": "2026-05-demo-coatings-inks",
   "synthetic": true,
+  "domain": "涂料/油墨",
   "sources": [
     {
       "title": "企业物质禁忌矩阵演示规则",
@@ -11,7 +12,7 @@
       "version": "matrix-demo-2026-05",
       "effective_date": "2026-05-01",
       "license_note": "合成演示规则，生产环境应替换为企业批准的 EHS 禁忌矩阵。",
-      "content": "规则 incompatibility_oxidizer_flammable：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1 属于可燃液体；过氧化氢 CAS 7722-84-1 属于氧化剂。配方、工艺或储运场景中若同时出现可燃液体与氧化剂并计划混配或同储，应判定为禁忌组合，不合规。规则 incompatibility_hypochlorite_acid：次氯酸钠 CAS 7681-52-9 与盐酸 CAS 7647-01-0 或其他酸类混合、同槽、同罐或同储时可能释放氯气，应判定为禁忌组合，不合规。规则 storage_compatible：水 CAS 7732-18-5 与氯化钠 CAS 7647-14-5 在本演示规则包中按一般液体兼容处理。"
+      "content": "规则 incompatibility_oxidizer_flammable：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、乙酸乙酯 CAS 141-78-6、甲苯 CAS 108-88-3 等属于可燃液体；过氧化氢 CAS 7722-84-1、过氧化苯甲酰 CAS 94-36-0、过硫酸铵 CAS 7727-54-0 属于氧化剂。涂料 / 油墨配方、研磨工艺或储运场景中若同时出现可燃液体与氧化剂并计划混配、同釜分散或同库存放，应判定为禁忌组合，输出不合规（block）。规则 incompatibility_hypochlorite_acid：次氯酸钠 CAS 7681-52-9 与盐酸 CAS 7647-01-0 或其他酸类混合、同槽、同罐或同储时可能释放氯气，应判定为禁忌组合。规则 storage_compatible：水 CAS 7732-18-5、丙二醇 CAS 57-55-6、丙烯酸酯乳液在本演示规则包中按一般水性涂料组分兼容处理。"
     },
     {
       "title": "企业内部化工准入红线演示规则",
@@ -21,7 +22,7 @@
       "version": "redline-demo-2026-05",
       "effective_date": "2026-05-01",
       "license_note": "合成演示规则，生产环境应由企业合规、EHS 和业务负责人批准。",
-      "content": "规则 unknown_substance_review：未知 CAS、未进入物质主数据或知识库无命中的物质不得自动放行，必须进入复核。规则 process_parameters_missing：配方合规预审必须具备关键工艺温度、压力和关键步骤；缺失时输出复核。规则 sds_missing_sections：SDS 不满足 16 章节结构时输出复核。规则 formula_components_missing：配方表或 SDS 未提供 CAS、浓度或等效保密成分合规声明时输出复核。规则 sds_revision_outdated：SDS 修订日期早于 2023-01-01 或无法证明版本有效时输出复核。规则 enterprise_redline_benzene：苯 CAS 71-43-2 在本演示企业红线中禁止作为新供应商物料准入，命中时输出不合规。"
+      "content": "规则 unknown_substance_review：未知 CAS、未进入物质主数据或知识库无命中的物质不得自动放行，必须进入复核。规则 process_parameters_missing：涂料 / 油墨配方合规预审必须具备分散温度、研磨温度、压力或转速、关键步骤；缺失时输出 needs_supplement。规则 sds_missing_sections：SDS 不满足 GB/T 16483-2008 规定的 16 章节结构时输出 needs_supplement。规则 formula_components_missing：配方表或 SDS 未提供 CAS、浓度或等效保密成分合规声明时输出 needs_supplement。规则 sds_revision_outdated：SDS 修订日期早于 2023-01-01 或无法证明版本有效时输出 needs_review。规则 enterprise_redline_benzene：苯 CAS 71-43-2 在本演示企业红线中禁止作为新供应商物料准入，命中时输出不合规（block）。"
     },
     {
       "title": "企业储运兼容性演示规则",
@@ -31,7 +32,7 @@
       "version": "storage-demo-2026-05",
       "effective_date": "2026-05-01",
       "license_note": "合成演示规则，生产环境应结合仓库分区、消防设计、运输分类和客户制度确认。",
-      "content": "规则 flammable_storage_missing：丙酮 CAS 67-64-1、乙醇 CAS 64-17-5、苯 CAS 71-43-2 等可燃液体如 SDS、配方表或工艺资料未提供明确储存条件、防火隔离、通风或防爆要求，应输出复核。规则 transport_un_mismatch：乙醇/可燃液体清洗液通常应与 UN 1170 或 UN 1993 等运输信息一致；如资料中出现 UN 3082 等与物料危险类别明显不一致的编号，应输出复核。"
+      "content": "规则 flammable_storage_missing：丙酮 CAS 67-64-1、乙醇 CAS 64-17-5、乙酸乙酯 CAS 141-78-6、甲苯 CAS 108-88-3 等可燃液体如 SDS 第 7 章、配方表或工艺资料未提供明确储存温度、防火隔离距离、机械通风或防爆电气要求，应输出 needs_review。规则 transport_un_mismatch：乙醇 / 可燃液体清洗液或溶剂型涂料通常应与 UN 1170 / UN 1263 / UN 1993 等运输信息一致；如资料中出现 UN 3082 等与物料危险类别明显不一致的编号，应输出 needs_review。"
     },
     {
       "title": "企业氧化剂工艺安全演示规则",
@@ -41,7 +42,7 @@
       "version": "process-demo-2026-05",
       "effective_date": "2026-05-01",
       "license_note": "合成演示规则，生产环境应结合 HAZOP、SOP 和装置设计确认。",
-      "content": "规则 oxidizer_high_temperature_process：过氧化氢 CAS 7722-84-1 等氧化剂若工艺温度达到或超过 60 C，或资料显示加热、热源、夹套升温、循环喷淋等高温操作，应输出复核，并要求 EHS 或工艺安全人员确认稳定性、分解风险和防护措施。"
+      "content": "规则 oxidizer_high_temperature_process：过氧化氢 CAS 7722-84-1、过氧化苯甲酰 CAS 94-36-0 等氧化剂若工艺温度达到或超过 60 C，或资料显示加热、热源、夹套升温、循环喷淋等高温操作，应输出 needs_review，并要求 EHS 或工艺安全人员确认稳定性、分解风险和防护措施。"
     },
     {
       "title": "中国危险化学品目录演示摘录",
@@ -51,7 +52,7 @@
       "version": "2015-demo",
       "effective_date": "2015-09-02",
       "license_note": "基于公开目录说明的合成演示摘录，不包含法规原文全文。",
-      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2 在本演示包中按危险化学品目录命中信号处理。水 CAS 7732-18-5 与氯化钠 CAS 7647-14-5 在本演示包中不产生危险化学品目录命中。规则 hazardous_catalog_match：目录命中不等于直接不合规，但应结合用途、浓度、储运、许可和企业制度进行复核。"
+      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、甲苯 CAS 108-88-3、乙酸乙酯 CAS 141-78-6、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2 在本演示包中按危险化学品目录命中信号处理。水 CAS 7732-18-5、丙二醇 CAS 57-55-6、钛白粉 CAS 13463-67-7 在本演示包中不产生危险化学品目录命中。规则 hazardous_catalog_match：目录命中不等于直接不合规，但应结合用途、浓度、储运、许可和企业制度进行复核。规则 voc_limit_exceeded：参照 GB 30981-2020 和 CARB SCAQMD Rule 1113，溶剂型涂料 VOC 限值 250 g/L；超过限值应输出不合规（block）。"
     },
     {
       "title": "ECHA REACH/SVHC 演示摘录",
@@ -61,7 +62,7 @@
       "version": "2026-01-demo",
       "effective_date": "2026-01-01",
       "license_note": "合成演示摘录，生产环境应导入 ECHA 当前数据。",
-      "content": "演示筛查：双酚 A CAS 80-05-7 在本演示包中按 SVHC 命中信号处理，浓度达到或超过 0.1% w/w 时触发复核或风险提示。乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、水 CAS 7732-18-5、氯化钠 CAS 7647-14-5 在本演示摘录中不产生 SVHC 命中。规则 svhc_threshold_match：SVHC 命中需要法规人员结合用途、物品/混合物边界、客户市场和披露义务复核。"
+      "content": "演示筛查：双酚 A CAS 80-05-7、邻苯二甲酸二丁酯 DBP CAS 84-74-2、4-壬基酚 CAS 104-40-5 在本演示包中按 SVHC 命中信号处理；浓度达到或超过 0.1% w/w 时触发不合规，浓度在 0.05% – 0.1% w/w 区间触发 needs_review。乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、水 CAS 7732-18-5、钛白粉 CAS 13463-67-7 在本演示摘录中不产生 SVHC 命中。规则 svhc_threshold_match：SVHC 命中需要法规人员结合用途、物品/混合物边界、客户市场和披露义务复核（Article 33 / Article 7）。"
     },
     {
       "title": "EPA TSCA 与 OSHA HCS 演示摘录",
@@ -71,7 +72,135 @@
       "version": "2026-01-demo",
       "effective_date": "2026-01-01",
       "license_note": "合成演示摘录，生产环境应导入授权 EPA/OSHA 数据。",
-      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2、水 CAS 7732-18-5、氯化钠 CAS 7647-14-5 在本演示 TSCA 摘录中按已知物质处理。未知 CAS 123456-78-9 无清单命中，应进入复核。OSHA HCS 2024 演示规则要求 SDS/GHS 分类资料完整。规则 tsca_inventory_match：TSCA 命中仅表示演示清单可识别，不替代最终合规判断。"
+      "content": "演示筛查：乙醇 CAS 64-17-5、丙酮 CAS 67-64-1、甲苯 CAS 108-88-3、过氧化氢 CAS 7722-84-1、次氯酸钠 CAS 7681-52-9、盐酸 CAS 7647-01-0、苯 CAS 71-43-2、水 CAS 7732-18-5、钛白粉 CAS 13463-67-7 在本演示 TSCA 摘录中按已知物质处理。未知 CAS 123456-78-9 无清单命中，应进入复核。OSHA HCS 2024 演示规则要求 SDS/GHS 分类资料完整，象形图、信号词、H 语句、P 语句缺失时不得放行。规则 tsca_inventory_match：TSCA 命中仅表示演示清单可识别，不替代最终合规判断。规则 ghs_label_pictogram_missing：CLP / GB 30000.2 要求危险品标签包含产品标识、信号词（危险 / 警告）、象形图（GHS01–GHS09）、H/P 语句、供应商信息；任意一项缺失输出 needs_review。"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "sds_section_completeness",
+      "rule_name_zh": "SDS 章节完整性核查",
+      "regulation_ref": "GB/T 16483-2008 / OSHA HCS 2024 Appendix D",
+      "regulation_excerpt": "化学品安全技术说明书应包含 16 章内容，包括：化学品及企业标识、成分/组成信息、危险性概述、急救措施、消防措施、泄漏应急处理、操作处置与储存、接触控制/个体防护、理化特性、稳定性和反应性、毒理学资料、生态学资料、废弃处置、运输信息、法规信息、其他信息。",
+      "severity": "supplement",
+      "trigger_condition_zh": "SDS 缺失任意一章或章节内容空白 / 仅填写占位文案",
+      "expected_user_quote_keywords": ["第", "章", "未提供", "详见随货附件", "N/A", "暂未测试"]
+    },
+    {
+      "rule_id": "incompatibility_oxidizer_flammable",
+      "rule_name_zh": "可燃液体与氧化剂禁忌组合",
+      "regulation_ref": "GB 15603-2022 / NFPA 430",
+      "regulation_excerpt": "氧化性物质（包括过氧化氢、过氧化苯甲酰、过硫酸铵等）应与可燃液体（乙醇、丙酮、甲苯、乙酸乙酯等）实施物理隔离储存与分散使用，禁止同釜、同槽或同储存兼容单元处理；如必须同库存放，应设置独立防火隔间并明确隔离距离。",
+      "severity": "block",
+      "trigger_condition_zh": "配方或工艺资料同时出现可燃液体与氧化剂，并显示同釜混配、同槽研磨或同库储存",
+      "expected_user_quote_keywords": ["过氧化氢", "H2O2", "乙醇", "甲苯", "同釜", "混配", "室温常压"]
+    },
+    {
+      "rule_id": "svhc_threshold_match",
+      "rule_name_zh": "REACH SVHC 阈值核查",
+      "regulation_ref": "ECHA Candidate List / REACH Article 33 / Article 7",
+      "regulation_excerpt": "Candidate List 上的高度关注物质（SVHC）若在物品中浓度达到或超过 0.1% w/w，应履行通报与披露义务。浓度在 0.05% – 0.1% 边界区间的混合物，企业内部应纳入风险复核流程。",
+      "severity": "review",
+      "trigger_condition_zh": "配方含 SVHC 物质（如双酚 A、DBP、4-壬基酚），浓度在 0.05% – 0.1% 边界区间",
+      "expected_user_quote_keywords": ["双酚 A", "Bisphenol A", "CAS 80-05-7", "0.08", "SVHC", "REACH"]
+    },
+    {
+      "rule_id": "voc_limit_exceeded",
+      "rule_name_zh": "VOC 限值合规核查",
+      "regulation_ref": "GB 30981-2020 / CARB SCAQMD Rule 1113",
+      "regulation_excerpt": "工业防护涂料、木器涂料、建筑用墙面涂料应符合相应类别的 VOC 限值。溶剂型工业涂料 VOC 限值为 250 g/L；超出限值的产品不得在 CN / EU / US 主流市场销售。",
+      "severity": "block",
+      "trigger_condition_zh": "配方或 SDS 第 9 章披露 VOC 总量超过 250 g/L 限值",
+      "expected_user_quote_keywords": ["VOC", "g/L", "350", "总挥发性有机物", "CARB"]
+    },
+    {
+      "rule_id": "formula_cas_missing",
+      "rule_name_zh": "配方组分 CAS 完整性核查",
+      "regulation_ref": "GB 30000 系列 / REACH Annex II",
+      "regulation_excerpt": "混合物的所有危险组分必须提供 CAS 号、EC 号、浓度或浓度范围。仅以商品名、内部代号或保密声明替代 CAS 时，无法完成 TSCA / REACH / 危化品目录初筛，必须要求供应商补充。",
+      "severity": "supplement",
+      "trigger_condition_zh": "配方表中存在组分仅有商品名 / 内部代号，无 CAS",
+      "expected_user_quote_keywords": ["商品名", "保密", "内部代号", "未披露", "CAS：", "—"]
+    },
+    {
+      "rule_id": "process_parameters_missing",
+      "rule_name_zh": "工艺关键参数完整性核查",
+      "regulation_ref": "企业 HAZOP 内部规则 / GB/T 13869",
+      "regulation_excerpt": "涂料 / 油墨研磨、分散、调漆工艺应明确：预分散温度、研磨温度上限、搅拌转速、研磨时间、关键步骤顺序、N2 保护或防爆要求。模糊描述（如『加热至适宜温度』）不得作为可审依据。",
+      "severity": "supplement",
+      "trigger_condition_zh": "工艺文档缺失温度数值 / 压力 / 转速 / 关键步骤，或使用『适宜』『常规』等模糊描述",
+      "expected_user_quote_keywords": ["加热至适宜温度", "常规搅拌", "适当", "适宜", "见 SOP", "另行通知"]
+    },
+    {
+      "rule_id": "flammable_storage_missing",
+      "rule_name_zh": "可燃液体储存条件核查",
+      "regulation_ref": "GB 15603-2022 / GB 17914-2013",
+      "regulation_excerpt": "可燃液体应储存于阴凉、通风、远离火源和氧化剂的专用库房，使用防爆电气，配置机械通风。SDS 第 7 章 / 工艺文档须明确储存温度、防火隔离距离、通风换气次数。",
+      "severity": "review",
+      "trigger_condition_zh": "含可燃液体但 SDS 第 7 章只写『室温常压通风』或留空",
+      "expected_user_quote_keywords": ["室温常压", "通风", "无特殊要求", "常温"]
+    },
+    {
+      "rule_id": "ghs_label_pictogram_missing",
+      "rule_name_zh": "GHS 标签与象形图核查",
+      "regulation_ref": "GB 30000.2-2013 / CLP Regulation (EC) No 1272/2008",
+      "regulation_excerpt": "化学品标签应包含：产品标识、信号词（危险 / 警告）、危险性象形图（GHS01 爆炸物、GHS02 易燃、GHS03 氧化剂、GHS05 腐蚀、GHS06 急毒、GHS07 健康危害、GHS08 慢性健康危害、GHS09 环境危害）、H 危险性说明、P 防范说明、供应商信息。",
+      "severity": "review",
+      "trigger_condition_zh": "SDS 第 2 章 / 第 15 章未提供完整 GHS 象形图编号、信号词或 H/P 语句",
+      "expected_user_quote_keywords": ["GHS", "象形图", "信号词", "危险", "警告", "H22", "P21"]
+    },
+    {
+      "rule_id": "enterprise_redline_benzene",
+      "rule_name_zh": "企业红线 — 禁苯",
+      "regulation_ref": "企业 EHS 红线手册 v2026.05",
+      "regulation_excerpt": "苯 CAS 71-43-2 为 IARC 第 1 类致癌物（GHS08）。本企业涂料 / 油墨业务线自 2024-01 起禁止苯作为溶剂或工艺助剂；新供应商若 SDS / 配方显示含苯，无论浓度高低，一律不予准入。",
+      "severity": "block",
+      "trigger_condition_zh": "配方或 SDS 中检出苯 CAS 71-43-2",
+      "expected_user_quote_keywords": ["苯", "Benzene", "71-43-2", "致癌"]
+    },
+    {
+      "rule_id": "transport_un_mismatch",
+      "rule_name_zh": "运输 UN 编号与物料危险类别一致性",
+      "regulation_ref": "GB 6944-2012 / ADR 2025 / 49 CFR §172.101",
+      "regulation_excerpt": "可燃液体涂料常用 UN 1263（漆类，包括油漆、清漆、瓷漆、着色剂、虫胶等）、UN 1170（乙醇溶液）、UN 1993（其他易燃液体）。SDS 第 14 章 UN 编号必须与第 2 章 GHS 分类一致；出现 UN 3082（环境危害物质）等明显不匹配编号应复核。",
+      "severity": "review",
+      "trigger_condition_zh": "SDS 第 14 章 UN 编号与第 2 章危险性概述明显不一致",
+      "expected_user_quote_keywords": ["UN", "1263", "1170", "1993", "3082", "运输"]
+    },
+    {
+      "rule_id": "sds_revision_outdated",
+      "rule_name_zh": "SDS 修订日期时效核查",
+      "regulation_ref": "OSHA HCS 2024 / REACH Annex II Section 16",
+      "regulation_excerpt": "SDS 第 16 章应注明修订版本号与修订日期。修订日期早于 2023-01-01 或无法证明版本有效（无版本号 / 无修订记录）时，认为版本过期或追溯性不足，不可作为合规证据。",
+      "severity": "review",
+      "trigger_condition_zh": "SDS 第 16 章修订日期早于 2023-01-01 或字段缺失",
+      "expected_user_quote_keywords": ["修订日期", "版本", "Revision", "2022", "2021"]
+    },
+    {
+      "rule_id": "oxidizer_high_temperature_process",
+      "rule_name_zh": "氧化剂高温工艺安全核查",
+      "regulation_ref": "企业 HAZOP / GB 13690-2009",
+      "regulation_excerpt": "过氧化氢、过氧化苯甲酰等氧化剂在 60°C 以上可能加速分解，存在放热失控与压力骤升风险。若工艺温度达到或超过 60°C，必须有冷却联锁、紧急泄压、N2 保护或独立隔离防爆设施。",
+      "severity": "review",
+      "trigger_condition_zh": "配方含氧化剂且工艺温度 ≥ 60°C，无冷却 / N2 / 防爆描述",
+      "expected_user_quote_keywords": ["过氧化氢", "60", "70", "加热", "升温"]
+    },
+    {
+      "rule_id": "hazardous_catalog_match",
+      "rule_name_zh": "危险化学品目录命中核查",
+      "regulation_ref": "应急管理部《危险化学品目录（2015版）》",
+      "regulation_excerpt": "危险化学品目录命中物质（如乙醇、丙酮、甲苯、过氧化氢等）须按危化品管理：经营许可、储存量管控、双重预防机制、专用台账、运输资质等。目录命中不等于不合规，但应输出复核以确认企业资质边界。",
+      "severity": "review",
+      "trigger_condition_zh": "配方 / SDS 命中危化品目录演示信号物质",
+      "expected_user_quote_keywords": ["危险化学品", "目录", "经营许可"]
+    },
+    {
+      "rule_id": "unknown_substance_review",
+      "rule_name_zh": "未知 / 未命中物质复核",
+      "regulation_ref": "企业准入流程内部规则",
+      "regulation_excerpt": "若配方含 CAS 在知识库未命中、未进入企业物质主数据，或仅以保密成分披露，系统不得自动放行，必须由法规 / EHS 人工复核物质身份与适用法规。",
+      "severity": "review",
+      "trigger_condition_zh": "配方含未知 CAS 或保密成分占比 > 1%",
+      "expected_user_quote_keywords": ["未知", "保密", "商业秘密", "Trade secret"]
     }
   ]
 }

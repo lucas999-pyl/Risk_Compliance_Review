@@ -1,0 +1,419 @@
+diff --git a/.env.example b/.env.example
+index 5983f2e..50a9049 100644
+--- a/.env.example
++++ b/.env.example
+@@ -2,16 +2,26 @@ APP_NAME=化工合规 RAG 工具
+ DATABASE_PATH=data/risk-review.db
+ STORAGE_DIR=data/objects
+ 
+-# 阿里云百炼 OpenAI-compatible 配置。不要把真实 Key 提交到代码仓库。
+-OPENAI_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
+-OPENAI_API_KEY=replace-me
++# ====================================================================
++# 双平台 OpenAI-兼容 v1 凭证（embed 与 LLM 各一套，互不影响）
++# 如只想用同一平台，下面 4 个字段填同样的 base_url + api_key 即可，
++# 或继续使用旧的 OPENAI_API_BASE + OPENAI_API_KEY（自动回填给两边）。
++# ====================================================================
+ 
+-# Demo2.0: Qwen Embedding + Qwen LLM。远程不可用时会降级到 hash embedding 和规则解释。
+-CHEM_RAG_EMBEDDING_PROVIDER=qwen
++# Embedding 平台：UniAPI 转发 Qwen text-embedding-v4（OpenAI 兼容 v1）
++CHEM_RAG_EMBEDDING_BASE_URL=https://api.uniapi.io/v1
++CHEM_RAG_EMBEDDING_API_KEY=<填 UniAPI 平台 API Key>
++CHEM_RAG_EMBEDDING_PROVIDER=openai_compatible
+ CHEM_RAG_EMBEDDING_MODEL=text-embedding-v4
+ CHEM_RAG_EMBEDDING_DIMENSIONS=1024
+-CHEM_RAG_LLM_PROVIDER=qwen
+-CHEM_RAG_LLM_MODEL=qwen3.6-plus
++
++# LLM 平台：DeepSeek 官方（OpenAI 兼容 v1，V4 系列 2026-04-24 发布）
++CHEM_RAG_LLM_BASE_URL=https://api.deepseek.com/v1
++CHEM_RAG_LLM_API_KEY=<填 DeepSeek 官方 API Key>
++CHEM_RAG_LLM_PROVIDER=openai_compatible
++CHEM_RAG_LLM_MODEL=deepseek-v4-flash
++
++# 共享配置
+ CHEM_RAG_VECTOR_STORE_DIR=data/vector_store/chemical_rag
+-CHEM_RAG_REQUEST_TIMEOUT_SECONDS=20
++CHEM_RAG_REQUEST_TIMEOUT_SECONDS=30
+ RCR_ENABLE_LLM=true
+diff --git a/backend/app/ai_clients.py b/backend/app/ai_clients.py
+index 6ebf6f4..116470d 100644
+--- a/backend/app/ai_clients.py
++++ b/backend/app/ai_clients.py
+@@ -19,6 +19,8 @@ class AIClientConfig:
+     llm_provider: str
+     llm_model: str
+     timeout_seconds: float
++    llm_base_url: str | None = None
++    llm_api_key: str | None = None
+ 
+ 
+ class EmbeddingClient:
+@@ -99,14 +101,18 @@ class LLMClient:
+         }
+ 
+     def _should_call_remote(self) -> bool:
++        base = self.config.llm_base_url or self.config.base_url
++        key = self.config.llm_api_key or self.config.api_key
+         return (
+             self.config.llm_provider in {"auto", "qwen", "openai_compatible"}
+-            and bool(self.config.base_url)
+-            and bool(self.config.api_key)
++            and bool(base)
++            and bool(key)
+         )
+ 
+     def _remote_chat(self, agent_name: str, verdict: str, reasons: list[str], evidence_snippets: list[str]) -> str:
+-        url = f"{self.config.base_url.rstrip('/')}/chat/completions"
++        base = self.config.llm_base_url or self.config.base_url
++        key = self.config.llm_api_key or self.config.api_key
++        url = f"{base.rstrip('/')}/chat/completions"
+         prompt = (
+             "你是化工合规预审系统中的专业子 Agent。"
+             "请只基于给定规则结论和证据片段，用两句话解释判断依据；"
+@@ -133,7 +139,7 @@ class LLMClient:
+             url,
+             data=payload,
+             headers={
+-                "Authorization": f"Bearer {self.config.api_key}",
++                "Authorization": f"Bearer {key}",
+                 "Content-Type": "application/json",
+             },
+             method="POST",
+diff --git a/backend/app/chemical_rag.py b/backend/app/chemical_rag.py
+index 2cd5603..b8d34fa 100644
+--- a/backend/app/chemical_rag.py
++++ b/backend/app/chemical_rag.py
+@@ -248,14 +248,16 @@ class ChemicalRagRunner:
+         self.settings = settings or Settings()
+         self.dataset_root = dataset_root
+         self.ai_config = AIClientConfig(
+-            base_url=self.settings.openai_compatible_base_url,
+-            api_key=self.settings.openai_compatible_api_key,
++            base_url=self.settings.chem_rag_embedding_base_url,
++            api_key=self.settings.chem_rag_embedding_api_key,
+             embedding_provider=self.settings.chem_rag_embedding_provider if self.settings.enable_llm else "hash",
+             embedding_model=self.settings.chem_rag_embedding_model,
+             embedding_dimensions=self.settings.chem_rag_embedding_dimensions,
+             llm_provider=self.settings.chem_rag_llm_provider if self.settings.enable_llm else "disabled",
+             llm_model=self.settings.chem_rag_llm_model,
+             timeout_seconds=self.settings.chem_rag_request_timeout_seconds,
++            llm_base_url=self.settings.chem_rag_llm_base_url,
++            llm_api_key=self.settings.chem_rag_llm_api_key,
+         )
+         self.embedding_client = vector_store.embedding_client if vector_store else EmbeddingClient(self.ai_config)
+         self.vector_store = vector_store or SQLiteVectorStore(
+diff --git a/backend/app/factory.py b/backend/app/factory.py
+index 933b9e2..d6e4374 100644
+--- a/backend/app/factory.py
++++ b/backend/app/factory.py
+@@ -3,9 +3,12 @@ from __future__ import annotations
+ from pathlib import Path
+ from zipfile import ZIP_DEFLATED, ZipFile
+ 
++from datetime import datetime
++
+ from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+-from fastapi.responses import FileResponse, Response
++from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+ from fastapi.middleware.cors import CORSMiddleware
++from fastapi.staticfiles import StaticFiles
+ 
+ from app.models import (
+     CaseCreate,
+@@ -46,14 +49,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
+     settings = settings or Settings()
+     store = SQLiteStore(settings.database_path, settings.storage_dir)
+     ai_config = AIClientConfig(
+-        base_url=settings.openai_compatible_base_url,
+-        api_key=settings.openai_compatible_api_key,
++        base_url=settings.chem_rag_embedding_base_url,
++        api_key=settings.chem_rag_embedding_api_key,
+         embedding_provider=settings.chem_rag_embedding_provider if settings.enable_llm else "hash",
+         embedding_model=settings.chem_rag_embedding_model,
+         embedding_dimensions=settings.chem_rag_embedding_dimensions,
+         llm_provider=settings.chem_rag_llm_provider if settings.enable_llm else "disabled",
+         llm_model=settings.chem_rag_llm_model,
+         timeout_seconds=settings.chem_rag_request_timeout_seconds,
++        llm_base_url=settings.chem_rag_llm_base_url,
++        llm_api_key=settings.chem_rag_llm_api_key,
+     )
+     embedding_client = EmbeddingClient(ai_config)
+     vector_store = SQLiteVectorStore(Path(settings.chem_rag_vector_store_dir) / "vectors.sqlite3", embedding_client)
+@@ -71,6 +76,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
+         allow_headers=["*"],
+     )
+ 
++    app.mount(
++        "/static",
++        StaticFiles(directory=Path(__file__).parent / "static"),
++        name="static",
++    )
++
+     def get_service() -> ComplianceReviewService:
+         return app.state.service
+ 
+@@ -85,6 +96,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
+     def workbench() -> FileResponse:
+         return FileResponse(Path(__file__).parent / "static" / "index.html", media_type="text/html; charset=utf-8")
+ 
++    @app.get("/legacy", include_in_schema=False)
++    def legacy() -> FileResponse:
++        return FileResponse(Path(__file__).parent / "static" / "legacy.html", media_type="text/html; charset=utf-8")
++
+     @app.get("/data_samples/chemical_rag_dataset/upload_samples/{filename}", include_in_schema=False)
+     def chemical_upload_sample(filename: str) -> FileResponse:
+         sample_dir = Path(__file__).resolve().parents[2] / "data_samples" / "chemical_rag_dataset" / "upload_samples"
+@@ -448,6 +463,77 @@ def create_app(settings: Settings | None = None) -> FastAPI:
+     def technology_evaluation(runner: ChemicalRagRunner = Depends(get_chemical_runner)) -> dict:
+         return runner.evaluate_dataset()
+ 
++    @app.get("/cases/{case_id}/print", include_in_schema=False)
++    def case_report_print_template(case_id: str) -> HTMLResponse:
++        """打印态 HTML。chromium 内部访问转 PDF；也允许人工打开调试。无 nav / 无 sidebar。"""
++        from app.pdf_render import build_print_html
++
++        case = store.get_case(case_id)
++        if not case:
++            raise HTTPException(status_code=404, detail="Case not found")
++        latest = store.latest_report(case_id)
++        if not latest:
++            raise HTTPException(status_code=409, detail="Case has no completed review yet")
++        documents = store.get_documents(case_id)
++        html = build_print_html(case, latest["payload"], documents=documents)
++        return HTMLResponse(html)
++
++    @app.get("/api/cases/{case_id}/report.pdf", include_in_schema=False)
++    async def case_report_pdf(case_id: str) -> Response:
++        from app.pdf_render import (
++            CaseNotReady,
++            PDFRendererUnavailable,
++            render_case_report_pdf,
++        )
++
++        case = store.get_case(case_id)
++        if not case:
++            raise HTTPException(status_code=404, detail="Case not found")
++        latest = store.latest_report(case_id)
++        if not latest:
++            return JSONResponse(
++                {"error": "Case has no completed review yet"},
++                status_code=409,
++            )
++        host = getattr(settings, "pdf_render_base_url", None) or "http://127.0.0.1:8888"
++        try:
++            pdf_bytes = await render_case_report_pdf(case_id, store, base_url=host)
++        except CaseNotReady:
++            return JSONResponse(
++                {"error": "Case has no completed review yet"},
++                status_code=409,
++            )
++        except PDFRendererUnavailable as exc:
++            return JSONResponse(
++                {
++                    "error": "PDF renderer not available",
++                    "hint": "运行 playwright install chromium",
++                    "detail": str(exc),
++                },
++                status_code=500,
++            )
++        except Exception as exc:  # noqa: BLE001
++            return JSONResponse(
++                {"error": "Template render failed", "case_id": case_id, "detail": str(exc)},
++                status_code=500,
++            )
++        today = datetime.now().strftime("%Y%m%d")
++        # RFC 5987 encoding for non-ASCII filename (HTTP headers must be latin-1)
++        from urllib.parse import quote as _urlquote
++
++        ascii_fallback = f"{case_id}_report_{today}.pdf"
++        full_name = f"{case_id}_审查报告_{today}.pdf"
++        encoded = _urlquote(full_name, safe="")
++        disposition = (
++            f'attachment; filename="{ascii_fallback}"; '
++            f"filename*=UTF-8''{encoded}"
++        )
++        return Response(
++            content=pdf_bytes,
++            media_type="application/pdf",
++            headers={"Content-Disposition": disposition},
++        )
++
+     return app
+ 
+ 
+diff --git a/backend/app/settings.py b/backend/app/settings.py
+index f912122..fe60897 100644
+--- a/backend/app/settings.py
++++ b/backend/app/settings.py
+@@ -11,6 +11,22 @@ class Settings(BaseSettings):
+     enable_llm: bool = Field(default=False, validation_alias=AliasChoices("RCR_ENABLE_LLM", "ENABLE_LLM"))
+     openai_compatible_base_url: str | None = Field(default=None, validation_alias="OPENAI_API_BASE")
+     openai_compatible_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
++    chem_rag_embedding_base_url: str | None = Field(
++        default=None,
++        validation_alias=AliasChoices("CHEM_RAG_EMBEDDING_BASE_URL", "OPENAI_API_BASE"),
++    )
++    chem_rag_embedding_api_key: str | None = Field(
++        default=None,
++        validation_alias=AliasChoices("CHEM_RAG_EMBEDDING_API_KEY", "OPENAI_API_KEY"),
++    )
++    chem_rag_llm_base_url: str | None = Field(
++        default=None,
++        validation_alias=AliasChoices("CHEM_RAG_LLM_BASE_URL", "OPENAI_API_BASE"),
++    )
++    chem_rag_llm_api_key: str | None = Field(
++        default=None,
++        validation_alias=AliasChoices("CHEM_RAG_LLM_API_KEY", "OPENAI_API_KEY"),
++    )
+     chem_rag_embedding_provider: str = "qwen"
+     chem_rag_embedding_model: str = "text-embedding-v4"
+     chem_rag_embedding_dimensions: int = 1024
+diff --git a/backend/tests/test_customer_review_flow.py b/backend/tests/test_customer_review_flow.py
+index 188c66f..b95180a 100644
+--- a/backend/tests/test_customer_review_flow.py
++++ b/backend/tests/test_customer_review_flow.py
+@@ -382,7 +382,7 @@ def test_review_scenarios_recommend_business_check_types_and_keep_legacy_compati
+ 
+ 
+ def test_static_workbench_exposes_customer_flow_and_keeps_admin_advanced_task() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "合规预审 Case 工作台" in html
+     assert "Case 列表" in html
+diff --git a/backend/tests/test_static_workbench.py b/backend/tests/test_static_workbench.py
+index 340b19c..cb3e9a2 100644
+--- a/backend/tests/test_static_workbench.py
++++ b/backend/tests/test_static_workbench.py
+@@ -19,7 +19,7 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
+         )
+     )
+ 
+-    response = client.get("/")
++    response = client.get("/legacy")
+ 
+     assert response.status_code == 200
+     assert "化工合规 RAG 工具" in response.text
+@@ -50,7 +50,7 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
+ 
+ 
+ def test_customer_case_flow_is_primary_and_admin_debug_is_isolated() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert 'id="customerWorkbench"' in html
+     assert 'id="adminWorkbench"' in html
+@@ -99,7 +99,7 @@ def test_customer_case_flow_is_primary_and_admin_debug_is_isolated() -> None:
+ 
+ 
+ def test_trace_node_click_selection_is_not_reset_on_rerender() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "function selectNode(nodeId)" in html
+     assert "state.selectedNode = nodeId;" in html
+@@ -109,7 +109,7 @@ def test_trace_node_click_selection_is_not_reset_on_rerender() -> None:
+ 
+ 
+ def test_workbench_has_collapsible_result_sections_and_safe_text_wrapping() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert 'class="collapse-toggle"' in html
+     assert 'data-target="ragPipeline"' in html
+@@ -126,7 +126,7 @@ def test_workbench_has_collapsible_result_sections_and_safe_text_wrapping() -> N
+ 
+ 
+ def test_static_workbench_defaults_to_business_review_loop() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "原始资料" in html
+     assert "抽取校验" in html
+@@ -144,7 +144,7 @@ def test_static_workbench_defaults_to_business_review_loop() -> None:
+ 
+ 
+ def test_static_workbench_promotes_knowledge_base_and_upload_review() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "知识库工作台" in html
+     assert "上传审查" in html
+@@ -166,7 +166,7 @@ def test_static_workbench_promotes_knowledge_base_and_upload_review() -> None:
+ 
+ 
+ def test_static_workbench_is_task_driven_upload_review() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "审查任务" in html
+     assert "供应商资料包" in html
+@@ -188,7 +188,7 @@ def test_static_workbench_is_task_driven_upload_review() -> None:
+ 
+ 
+ def test_static_workbench_uses_official_pack_and_business_query_workbench() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "上传官方知识库源文档" in html
+     assert "manifest_file" in html
+@@ -208,7 +208,7 @@ def test_static_workbench_uses_official_pack_and_business_query_workbench() -> N
+ 
+ 
+ def test_static_workbench_moves_presets_to_review_task_multi_select() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "任务推荐" in html
+     assert "reviewTaskPresets" in html
+@@ -229,7 +229,7 @@ def test_static_workbench_moves_presets_to_review_task_multi_select() -> None:
+ 
+ 
+ def test_static_workbench_explains_button_roles_and_empty_knowledge_state() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "主流程：1 上传官方知识库源文档" in html
+     assert "内置评测集已收纳到开发者折叠区" in html
+@@ -242,7 +242,7 @@ def test_static_workbench_explains_button_roles_and_empty_knowledge_state() -> N
+ 
+ 
+ def test_static_workbench_locks_actions_while_uploading_knowledge_pack() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert 'id="clearKnowledgeFiles"' in html
+     assert "清除已选文件" in html
+@@ -256,7 +256,7 @@ def test_static_workbench_locks_actions_while_uploading_knowledge_pack() -> None
+ 
+ 
+ def test_static_workbench_demotes_quality_evaluation_to_collapsed_developer_panel() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert 'id="evalTab"' not in html
+     assert 'id="traceTab"' not in html
+@@ -271,7 +271,7 @@ def test_static_workbench_demotes_quality_evaluation_to_collapsed_developer_pane
+ 
+ 
+ def test_static_workbench_explains_source_documents_and_inline_flow_replay_detail() -> None:
+-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
++    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
+ 
+     assert "原始资料（上传文件原文 / 抽取依据）" in html
+     assert "用于核对系统是否真实读取了 SDS、配方表和工艺说明" in html
+diff --git a/backend/tests/test_technology_demo.py b/backend/tests/test_technology_demo.py
+index 80da3e4..b6e512e 100644
+--- a/backend/tests/test_technology_demo.py
++++ b/backend/tests/test_technology_demo.py
+@@ -71,7 +71,7 @@ def test_technology_evaluation_summarizes_golden_dataset(tmp_path: Path) -> None
+ def test_static_workbench_contains_technology_demo_tabs(tmp_path: Path) -> None:
+     client = _make_client(tmp_path)
+ 
+-    response = client.get("/")
++    response = client.get("/legacy")
+ 
+     assert response.status_code == 200
+     assert "化工合规 RAG 工具" in response.text

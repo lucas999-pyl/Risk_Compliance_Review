@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>{{ case_title }} · 审查报告</title>
+<link rel="stylesheet" href="/static/print/case-report.css" />
+</head>
+<body>
+<div class="sheet">
+
+  <div class="head-meta">化工合规预审 · 审查报告</div>
+  <h1>{{ case_title }}</h1>
+  <div class="sub">
+    <span>{{ case_id }}</span>
+    <span>{{ scenario_label }}</span>
+    <span>目标市场 {{ target_market }}</span>
+    <span>审查日期 {{ review_date }}</span>
+  </div>
+
+  <hr/>
+
+  <h2>审查结论</h2>
+  <div class="conclude-box">
+    <div class="badge {{ verdict_css }}">
+      <span class="glyph"></span>{{ verdict_zh }}
+    </div>
+    <div class="summary">{{ verdict_summary }}</div>
+  </div>
+
+  <hr/>
+
+  <h2>资料清单</h2>
+  <div class="file-list">
+    {{ documents_html }}
+  </div>
+
+  <hr/>
+
+  <h2>{{ findings_heading }}</h2>
+  {{ findings_html }}
+
+  <hr/>
+
+  <h2>签发</h2>
+  <div class="signoff">
+    <div class="col">
+      <div class="lab">审查员</div>
+      <div class="line"></div>
+      <div class="date">签字日期<span class="ln"></span></div>
+    </div>
+    <div class="col">
+      <div class="lab">复核员</div>
+      <div class="line"></div>
+      <div class="date">签字日期<span class="ln"></span></div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    本报告基于"提交资料 + 规则库"于 {{ generated_at_display }} 自动生成。结论需经审查员人工复核与签字后方可作为合规依据；规则库后续版本变化可能影响判定。
+  </div>
+
+</div>
+</body>
+</html>

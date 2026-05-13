@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>化工合规 RAG · 视觉稿索引</title>
+<style>
+  :root{
+    --primary:#0066cc;
+    --ink:#1d1d1f;--ink-48:#7a7a7a;
+    --hairline:#e0e0e0;--divider-soft:#f0f0f0;
+    --canvas:#fff;--parchment:#f5f5f7;--pearl:#fafafc;
+    --pass:#34c759;--warn:#ff9500;--block:#ff3b30;--mute:#8e8e93;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"PingFang SC","SF Pro Text",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:var(--ink);background:var(--parchment);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1280px;margin:0 auto;padding:80px 48px;}
+  .hd{margin-bottom:48px;}
+  .hd .eyebrow{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;text-transform:uppercase;font-weight:600;}
+  .hd h1{font-family:"PingFang SC","SF Pro Display",system-ui,-apple-system,sans-serif;font-size:48px;font-weight:600;line-height:1.07;letter-spacing:-0.5px;margin-top:14px;}
+  .hd .lead{font-size:17px;color:var(--ink-48);margin-top:14px;letter-spacing:-0.374px;max-width:720px;}
+  .hd .stats{margin-top:24px;display:flex;gap:24px;font-size:14px;color:var(--ink-48);letter-spacing:-0.224px;}
+  .hd .stats b{color:var(--ink);font-weight:600;}
+
+  .section{margin-top:64px;}
+  .section h2{font-size:14px;font-weight:600;color:var(--ink-48);letter-spacing:-0.224px;text-transform:uppercase;margin-bottom:18px;display:flex;justify-content:space-between;align-items:baseline;}
+  .section h2 .ct{color:var(--mute);font-weight:400;}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  a.card{display:block;text-decoration:none;color:var(--ink);background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:24px;transition:transform .12s ease;}
+  a.card:hover{transform:translateY(-1px);}
+  a.card:active{transform:scale(0.99);}
+  .card .num{font-size:13px;color:var(--ink-48);font-variant-numeric:tabular-nums;letter-spacing:-0.12px;font-weight:600;}
+  .card h3{font-size:18px;font-weight:600;line-height:1.3;letter-spacing:-0.374px;margin-top:8px;}
+  .card .desc{font-size:14px;color:var(--ink-48);margin-top:8px;letter-spacing:-0.224px;line-height:1.5;}
+  .card .chips{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;background:var(--parchment);border-radius:9999px;font-size:12px;color:var(--ink-80,#333);letter-spacing:-0.12px;line-height:1;}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+  .dot.pass{background:var(--pass);}.dot.warn{background:var(--warn);}.dot.block{background:var(--block);}.dot.mute{background:var(--mute);}.dot.blue{background:var(--primary);}
+
+  .foot{margin-top:80px;padding:32px;background:#1d1d1f;color:#fff;border-radius:18px;display:grid;grid-template-columns:1fr 1fr;gap:32px;}
+  .foot h3{font-size:17px;font-weight:600;letter-spacing:-0.374px;margin-bottom:14px;}
+  .foot ul{list-style:none;padding:0;color:#cccccc;font-size:14px;letter-spacing:-0.224px;line-height:1.7;}
+  .foot ul li::before{content:"·";color:#2997ff;margin-right:8px;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hd">
+    <div class="eyebrow">化工合规 RAG 工具 · UI v01 · 2026-05-13</div>
+    <h1>视觉稿索引 · 15 张</h1>
+    <div class="lead">按 UI_RedesignSpec_2026-05-13.md §12 产出清单交付。同一 SPA + 权限切换；Action Blue 唯一交互色；唯一 drop-shadow 留给报告主结论卡。</div>
+    <div class="stats">
+      <span><b>15</b> 视觉稿</span>
+      <span><b>1440px</b> 桌面宽</span>
+      <span><b>3</b> 圆角档：sm 8 / lg 18 / pill 9999</span>
+      <span><b>4</b> 状态色仅作 chip</span>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2>用户端 · 主旅程<span class="ct">01 → 09</span></h2>
+    <div class="grid">
+
+      <a class="card" href="01-case-board.html">
+        <div class="num">01</div>
+        <h3>Case 看板</h3>
+        <div class="desc">3 列卡片网格 · 每张卡 4-chip 关键产出 + 状态行 + 查看报告链接 · 末尾 dashed 新建占位</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>首页 / cases</span><span class="chip"><span class="dot mute"></span>默认 + 空态</span></div>
+      </a>
+
+      <a class="card" href="02-wizard-step1.html">
+        <div class="num">02</div>
+        <h3>Wizard · Step 1</h3>
+        <div class="desc">案件基本信息 · 标题 / 场景下拉 / 目标市场多选 chip</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>1 / 5</span><span class="chip"><span class="dot mute"></span>已填部分</span></div>
+      </a>
+
+      <a class="card" href="03-wizard-step2.html">
+        <div class="num">03</div>
+        <h3>Wizard · Step 2</h3>
+        <div class="desc">上传资料包 · 大号 dropzone + 上传列表 · 无显式"运行预检"按钮</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>2 / 5</span><span class="chip"><span class="dot warn"></span>上传中 62%</span></div>
+      </a>
+
+      <a class="card" href="04-wizard-step3.html">
+        <div class="num">04</div>
+        <h3>Wizard · Step 3</h3>
+        <div class="desc">预检结论 · 4 张 metric 卡（3 / 0 / 6 / 1）+ 文件识别明细 + 阻断卡</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>3 / 5</span><span class="chip"><span class="dot block"></span>1 项阻断</span></div>
+      </a>
+
+      <a class="card" href="05-wizard-step4.html">
+        <div class="num">05</div>
+        <h3>Wizard · Step 4</h3>
+        <div class="desc">审查范围 · 4 大类 18 项 · 系统推荐已勾选 14 项 · 可自定义</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>4 / 5</span><span class="chip"><span class="dot mute"></span>已选 14 / 18</span></div>
+      </a>
+
+      <a class="card" href="06-wizard-step5.html">
+        <div class="num">06</div>
+        <h3>Wizard · Step 5</h3>
+        <div class="desc">运行预审 · 6 子任务进度卡 · 主审节点正在 spinner 中</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>5 / 5</span><span class="chip"><span class="dot warn"></span>进行中 50%</span></div>
+      </a>
+
+      <a class="card" href="07-report-default.html">
+        <div class="num">07</div>
+        <h3>客户报告页 · 默认</h3>
+        <div class="desc">主结论卡（唯一 drop-shadow）+ 4 条不合规边到边 white/parchment 交替 tile · D37 四件套口径</div>
+        <div class="chips"><span class="chip"><span class="dot warn"></span>结论 · 需复核</span><span class="chip"><span class="dot blue"></span>管理员视角</span></div>
+      </a>
+
+      <a class="card" href="08-report-drawer.html">
+        <div class="num">08</div>
+        <h3>客户报告页 · 抽屉</h3>
+        <div class="desc">右侧时间线抽屉 440px 展开 · 5 节点 + 管理员 3 个 admin-only tab</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>抽屉展开</span><span class="chip"><span class="dot warn"></span>当前 Step 5</span></div>
+      </a>
+
+      <a class="card" href="09-report-rerun.html">
+        <div class="num">09</div>
+        <h3>客户报告页 · 待重跑</h3>
+        <div class="desc">顶部 warn alert-strip + 重新运行 CTA · 主结论卡灰化 dashed · 清单半透明</div>
+        <div class="chips"><span class="chip"><span class="dot warn"></span>数据已变更</span><span class="chip"><span class="dot mute"></span>旧结论失效</span></div>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>管理端 · 工作台<span class="ct">10 · 11</span></h2>
+    <div class="grid">
+
+      <a class="card" href="10-admin-kb.html">
+        <div class="num">10</div>
+        <h3>知识库工作台</h3>
+        <div class="desc">4 张 metric · Manifest + 5 份规则源 · 247 条已索引规则列表</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>/admin/kb</span><span class="chip"><span class="dot mute"></span>规则库 v2026.05</span></div>
+      </a>
+
+      <a class="card" href="11-admin-trace.html">
+        <div class="num">11</div>
+        <h3>审查回放</h3>
+        <div class="desc">10 节点垂直时间线 + 选中节点详情 4 折叠面板（query / TopK / I/O / Agent）</div>
+        <div class="chips"><span class="chip"><span class="dot warn"></span>RAG 节点选中</span><span class="chip"><span class="dot blue"></span>/admin/cases/trace</span></div>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>客户 PDF 模板<span class="ct">12 · 13 · 灰度可读</span></h2>
+    <div class="grid">
+
+      <a class="card" href="12-pdf-cover.html">
+        <div class="num">12</div>
+        <h3>PDF · 首页</h3>
+        <div class="desc">A4 纵向 · 抬头 + 结论盒（实/网纹 glyph）+ 资料清单 + 第 01 条不合规</div>
+        <div class="chips"><span class="chip"><span class="dot mute"></span>A4 794×1123</span><span class="chip"><span class="dot mute"></span>body 11pt</span></div>
+      </a>
+
+      <a class="card" href="13-pdf-continuation.html">
+        <div class="num">13</div>
+        <h3>PDF · 续页</h3>
+        <div class="desc">02–04 条不合规 + 审查员 / 复核员签发位 + 免责小字 + 页脚</div>
+        <div class="chips"><span class="chip"><span class="dot mute"></span>第 2 / 3 页</span><span class="chip"><span class="dot mute"></span>双栏签发</span></div>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>系统参考<span class="ct">14 · 15</span></h2>
+    <div class="grid">
+
+      <a class="card" href="14-progress-states.html">
+        <div class="num">14</div>
+        <h3>进度条 · 三粒度三态总览</h3>
+        <div class="desc">顶条 4 步 + Step 5 子任务卡 3 态 + 10 节点 trace 3 态 全部并排对照</div>
+        <div class="chips"><span class="chip"><span class="dot pass"></span>pass</span><span class="chip"><span class="dot warn"></span>warn</span><span class="chip"><span class="dot block"></span>block</span><span class="chip"><span class="dot mute"></span>mute</span></div>
+      </a>
+
+      <a class="card" href="15-token-summary.html">
+        <div class="num">15</div>
+        <h3>Token 摘要</h3>
+        <div class="desc">色板（品牌 / 中性 / 状态）+ 字体梯 10 级 + 圆角 4 档 + 间距 7 级 + Do/Don't 速查</div>
+        <div class="chips"><span class="chip"><span class="dot blue"></span>规则速查</span></div>
+      </a>
+
+    </div>
+  </section>
+
+  <div class="foot">
+    <div>
+      <h3>设计宪法 · 关键边界</h3>
+      <ul>
+        <li>Action Blue 唯一交互色，状态色仅作 chip 色点</li>
+        <li>圆角三档：sm 8（工具）/ lg 18（卡片）/ pill 9999（主 CTA）</li>
+        <li>边到边交替 white ↔ parchment ↔ dark，色变即分隔</li>
+        <li>整套唯一 drop-shadow → 报告页主结论卡</li>
+        <li>PDF 灰度可读：色块 + 实/虚线 + 实/网纹 glyph 三重编码</li>
+      </ul>
+    </div>
+    <div>
+      <h3>下一步</h3>
+      <ul>
+        <li>徐钰逐张 review · 标记 needs-changes / approved</li>
+        <li>对齐 D37 / D38 / D44 拍板，确认无歧义</li>
+        <li>定稿后写 HANDOFF #3 · 下发 Factory Agent 实施</li>
+        <li>实施期间若发现冲突 · 回写 spec + 新增 D 决策块</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>14 · 进度条三态</title><style>
+  :root{
+    --primary:#0066cc;--primary-focus:#0071e3;--primary-on-dark:#2997ff;
+    --ink:#1d1d1f;--ink-80:#333;--ink-48:#7a7a7a;--mute:#8e8e93;
+    --hairline:#e0e0e0;--divider-soft:#f0f0f0;
+    --canvas:#fff;--parchment:#f5f5f7;--pearl:#fafafc;
+    --tile-dark:#272729;--black:#000;
+    --pass:#34c759;--warn:#ff9500;--block:#ff3b30;
+    --font-display:"PingFang SC","SF Pro Display",system-ui,-apple-system,sans-serif;
+    --font-text:"PingFang SC","SF Pro Text",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font-text);font-size:16px;line-height:1.6;color:var(--ink);background:var(--parchment);-webkit-font-smoothing:antialiased;}
+  .caption{width:1440px;margin:0 auto;padding:20px 32px;background:var(--ink);color:#fff;display:grid;grid-template-columns:1fr auto auto auto;gap:32px;align-items:baseline;font-size:13px;line-height:1.4;letter-spacing:-0.08px;}
+  .caption .name{font-weight:600;font-size:14px;}
+  .caption .meta{color:#cccccc;}
+  .caption .meta b{color:#fff;font-weight:600;margin-right:6px;}
+  .caption .sub{color:#999;margin-top:4px;}
+  .frame{width:1440px;margin:0 auto;background:var(--canvas);display:grid;grid-template-columns:240px 1fr;grid-template-rows:44px 2px 44px 1fr;grid-template-areas:"nav nav" "pbar pbar" "stepbar stepbar" "side main";min-height:900px;}
+  .frame.no-progress{grid-template-rows:44px 1fr;grid-template-areas:"nav nav" "side main";}
+  .gnav{grid-area:nav;background:var(--black);color:#fff;height:44px;display:flex;align-items:center;padding:0 24px;gap:24px;font-size:12px;letter-spacing:-0.12px;}
+  .gnav .brand{font-weight:600;letter-spacing:-0.224px;font-size:13px;}
+  .gnav .crumb{color:#cccccc;}
+  .gnav .crumb b{color:#fff;font-weight:400;}
+  .gnav .spacer{flex:1;}
+  .gnav .switch{display:flex;background:rgba(255,255,255,0.08);border-radius:9999px;padding:3px;gap:0;}
+  .gnav .switch button{background:transparent;color:#cccccc;border:none;font:inherit;font-family:var(--font-text);padding:5px 14px;border-radius:9999px;cursor:pointer;letter-spacing:-0.12px;}
+  .gnav .switch button.on{background:var(--canvas);color:var(--ink);}
+  .gnav .me{color:#cccccc;}
+  .pbar{grid-area:pbar;background:var(--hairline);height:2px;display:flex;}
+  .pbar .seg{flex:1;background:var(--hairline);}
+  .pbar .seg.done{background:var(--primary);}
+  .pbar .seg.curr{background:var(--primary);opacity:0.5;}
+  .stepbar{grid-area:stepbar;background:var(--parchment);height:44px;display:flex;align-items:center;padding:0 32px;gap:24px;font-size:14px;letter-spacing:-0.224px;}
+  .stepbar .lead{font-weight:600;color:var(--ink);}
+  .stepbar .tasks{color:var(--mute);display:flex;gap:14px;}
+  .stepbar .tasks span.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .stepbar .tasks span.curr{color:var(--ink);}
+  .stepbar .spacer{flex:1;}
+  .stepbar .right{color:var(--ink-48);}
+  .side{grid-area:side;background:var(--pearl);border-right:1px solid var(--divider-soft);padding:24px 16px;display:flex;flex-direction:column;gap:6px;}
+  .side h6{font-size:12px;font-weight:400;letter-spacing:-0.12px;color:var(--ink-48);text-transform:uppercase;padding:0 12px 8px;}
+  .case-item{padding:12px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px;}
+  .case-item.active{background:var(--canvas);}
+  .case-item .title{font-size:14px;font-weight:600;letter-spacing:-0.224px;color:var(--ink);line-height:1.4;}
+  .case-item .sub{font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none;}
+  .dot.lg{width:10px;height:10px;}
+  .dot.pass{background:var(--pass);}.dot.warn{background:var(--warn);}.dot.block{background:var(--block);}.dot.mute{background:var(--mute);}
+  .main{grid-area:main;background:var(--canvas);}
+  .cta-primary{background:var(--primary);color:#fff;border:none;font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:11px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;white-space:nowrap;}
+  .cta-primary:active{transform:scale(0.97);}
+  .cta-primary.lg{font-family:var(--font-text);font-size:18px;font-weight:300;padding:14px 32px;}
+  .cta-primary[disabled],.cta-primary.disabled{background:#cfd0d3;color:#fff;cursor:not-allowed;}
+  .cta-ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:10px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;}
+  .cta-dark{background:var(--ink);color:#fff;border:none;font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 15px;border-radius:8px;cursor:pointer;}
+  .cta-pearl{background:var(--pearl);color:var(--ink-80);border:1px solid var(--divider-soft);font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .link{color:var(--primary);text-decoration:none;font-size:14px;letter-spacing:-0.224px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;background:var(--parchment);border-radius:9999px;font-size:12px;color:var(--ink-80);letter-spacing:-0.12px;line-height:1;}
+  .chip.strong{background:var(--canvas);border:1px solid var(--hairline);}
+  .chip.bare{background:transparent;padding:0;}
+
+  /* wizard 主区 */
+  .wzbody{padding:64px 80px 80px;max-width:1100px;}
+  .wzbody h1{font-family:var(--font-display);font-size:40px;font-weight:600;line-height:1.1;letter-spacing:-0.5px;}
+  .wzbody .lead{font-size:17px;color:var(--ink-48);margin-top:12px;letter-spacing:-0.374px;max-width:680px;}
+  .wzbody section{margin-top:48px;}
+  .field{margin-bottom:32px;}
+  .field label{display:block;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:10px;}
+  .field .hint{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:10px;}
+  .field input[type=text]{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;}
+  .field input[type=text]:focus{outline:2px solid var(--primary-focus);outline-offset:-2px;border-color:transparent;}
+  .field .select{position:relative;}
+  .field .select select{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;appearance:none;}
+  .field .select::after{content:"⌄";position:absolute;right:18px;top:14px;color:var(--ink-48);font-size:14px;}
+  .toggle-chips{display:flex;gap:12px;flex-wrap:wrap;}
+  .toggle{padding:10px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:9999px;cursor:pointer;font-size:14px;color:var(--ink);letter-spacing:-0.224px;}
+  .toggle.on{border-color:var(--primary);color:var(--primary);background:rgba(0,102,204,0.04);}
+
+  .wzfoot{display:flex;justify-content:space-between;align-items:center;padding:24px 80px;border-top:1px solid var(--divider-soft);background:var(--canvas);}
+  .wzfoot .step-tag{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* dropzone */
+  .dropzone{margin-top:16px;border:1px dashed var(--hairline);border-radius:18px;background:var(--parchment);padding:64px 32px;text-align:center;}
+  .dropzone .big{font-size:40px;color:var(--ink-48);line-height:1;font-weight:300;}
+  .dropzone .t{font-size:21px;font-weight:600;color:var(--ink);margin-top:18px;letter-spacing:-0.374px;}
+  .dropzone .h{font-size:14px;color:var(--ink-48);margin-top:8px;letter-spacing:-0.12px;}
+  .dropzone .actions{margin-top:24px;display:flex;justify-content:center;gap:12px;}
+
+  .uplist{margin-top:24px;display:flex;flex-direction:column;gap:10px;}
+  .uprow{display:grid;grid-template-columns:24px 1fr 100px 130px 80px;gap:16px;align-items:center;padding:14px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font-size:14px;letter-spacing:-0.224px;}
+  .uprow .name{color:var(--ink);font-weight:600;}
+  .uprow .name small{display:block;color:var(--ink-48);font-weight:400;font-size:12px;margin-top:2px;}
+  .uprow .size{color:var(--ink-48);text-align:right;}
+  .uprow .progressbar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;}
+  .uprow .progressbar > i{display:block;height:100%;background:var(--primary);}
+  .uprow .state{text-align:right;color:var(--ink-48);font-size:13px;}
+  .uprow .state.done{color:var(--pass);}
+  .uprow .icon-doc{width:24px;height:24px;border-radius:4px;background:var(--parchment);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-48);font-weight:600;}
+
+  /* metric cards */
+  .mc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .mc{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:8px;}
+  .mc .lab{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:8px;}
+  .mc .num{font-family:var(--font-display);font-size:48px;font-weight:600;line-height:1;letter-spacing:-0.5px;color:var(--ink);margin-top:8px;}
+  .mc .num.mute{color:var(--mute);}
+  .mc .desc{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* file ident row */
+  .file-ident{display:grid;grid-template-columns:24px 1fr 140px 90px 1fr;gap:16px;align-items:center;padding:18px 18px;border-bottom:1px solid var(--divider-soft);font-size:14px;letter-spacing:-0.224px;}
+  .file-ident:last-child{border-bottom:none;}
+  .file-ident .name{color:var(--ink);font-weight:600;}
+  .file-ident .desc{color:var(--ink-48);font-size:13px;}
+  .file-ident .pct{font-variant-numeric:tabular-nums;color:var(--ink-48);text-align:right;}
+
+  /* 范围清单 */
+  .scope-group{margin-bottom:32px;}
+  .scope-group h3{font-size:14px;font-weight:600;color:var(--ink-48);text-transform:none;letter-spacing:-0.224px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
+  .scope-group h3 .ct{font-weight:400;color:var(--mute);}
+  .scope-row{display:grid;grid-template-columns:24px 1fr 220px;gap:16px;padding:14px 18px;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .scope-row:hover{background:var(--pearl);}
+  .scope-row.recommended{background:rgba(0,102,204,0.03);}
+  .scope-row .cb{width:18px;height:18px;border:1.5px solid var(--hairline);border-radius:4px;background:var(--canvas);display:inline-block;position:relative;}
+  .scope-row.on .cb{background:var(--primary);border-color:var(--primary);}
+  .scope-row.on .cb::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);}
+  .scope-row .lbl{color:var(--ink);}
+  .scope-row .lbl small{display:block;color:var(--ink-48);font-size:12px;font-weight:400;margin-top:2px;letter-spacing:-0.12px;}
+  .scope-row .rule{color:var(--ink-48);font-size:12px;font-family:var(--font-text);text-align:right;letter-spacing:-0.12px;}
+
+  /* 运行预审 subtask 卡 */
+  .runcard{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:32px 40px;margin-top:32px;}
+  .runcard .total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;}
+  .runcard .total .t{font-size:21px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .runcard .total .pct{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--ink);letter-spacing:-0.5px;line-height:1;}
+  .runcard .bar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;margin-bottom:24px;}
+  .runcard .bar > i{display:block;height:100%;background:var(--primary);}
+  .runcard .sub-h{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:12px;}
+  .runcard .row{display:grid;grid-template-columns:14px 1fr 120px;gap:14px;padding:12px 0;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .runcard .row:last-child{border-bottom:none;}
+  .runcard .row .dot.lg{margin:0;}
+  .runcard .row .n.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .runcard .row .n.curr{color:var(--ink);font-weight:600;}
+  .runcard .row .n.mute{color:var(--mute);}
+  .runcard .row .st{text-align:right;font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .runcard .row .st.warn{color:var(--warn);}
+  .spinner{display:inline-block;width:10px;height:10px;border:1.5px solid var(--warn);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:middle;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  /* 阻断/补件卡 */
+  .alert-card{margin-top:32px;padding:24px;border:1px solid var(--hairline);border-radius:18px;background:var(--canvas);}
+  .alert-card .head{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:14px;}
+  .alert-card ul{list-style:none;padding:0;margin:0;}
+  .alert-card li{padding:10px 0;border-bottom:1px solid var(--divider-soft);font-size:14px;color:var(--ink-80);letter-spacing:-0.224px;}
+  .alert-card li:last-child{border-bottom:none;}
+  .alert-card li b{font-weight:600;color:var(--ink);}
+  .alert-card .act{margin-top:14px;display:flex;justify-content:flex-end;}
+
+  body{background:var(--parchment);}
+  .frame{display:block;width:1440px;min-height:auto;background:var(--canvas);padding:48px 80px 80px;}
+
+  /* progress 三态 */
+  .pg-hd{margin-bottom:32px;}
+  .pg-hd h1{font-family:var(--font-display);font-size:40px;font-weight:600;line-height:1.1;letter-spacing:-0.5px;}
+  .pg-hd .lead{font-size:17px;color:var(--ink-48);margin-top:12px;letter-spacing:-0.374px;max-width:780px;}
+
+  .pg-section{margin-top:48px;}
+  .pg-section .sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--divider-soft);}
+  .pg-section .sec-h h2{font-size:21px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .pg-section .sec-h .meta{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* 顶条三态对照 */
+  .pg-row{display:grid;grid-template-columns:140px 1fr;gap:24px;padding:20px 0;border-bottom:1px solid var(--divider-soft);align-items:center;}
+  .pg-row:last-child{border-bottom:none;}
+  .pg-row .lab{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;}
+  .pg-row .lab small{display:block;font-weight:400;color:var(--ink-48);font-size:12px;margin-top:2px;letter-spacing:-0.12px;}
+
+  .demo-topbar{background:var(--parchment);border-radius:8px;overflow:hidden;}
+  .demo-topbar .bar{height:2px;background:var(--hairline);display:flex;}
+  .demo-topbar .bar .seg{flex:1;}
+  .demo-topbar .bar .seg.done{background:var(--primary);}
+  .demo-topbar .bar .seg.curr{background:var(--primary);opacity:0.5;}
+  .demo-topbar .step{height:44px;display:flex;align-items:center;padding:0 24px;gap:18px;font-size:14px;letter-spacing:-0.224px;}
+  .demo-topbar .step .lead{font-weight:600;color:var(--ink);}
+  .demo-topbar .step .tasks{color:var(--mute);display:flex;gap:14px;}
+  .demo-topbar .step .tasks span.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .demo-topbar .step .tasks span.curr{color:var(--ink);}
+  .demo-topbar .step .spacer{flex:1;}
+  .demo-topbar .step .right{color:var(--ink-48);font-size:13px;letter-spacing:-0.12px;}
+
+  /* subtask 三态 */
+  .pg-subgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;}
+  .subcard{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:28px 28px;}
+  .subcard .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
+  .subcard .h .t{font-size:17px;font-weight:600;letter-spacing:-0.374px;}
+  .subcard .h .p{font-family:var(--font-display);font-size:28px;font-weight:600;letter-spacing:-0.5px;line-height:1;}
+  .subcard .bar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;margin-bottom:18px;}
+  .subcard .bar > i{display:block;height:100%;background:var(--primary);}
+  .subcard .row{display:grid;grid-template-columns:14px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:13px;letter-spacing:-0.12px;}
+  .subcard .row:last-child{border-bottom:none;}
+  .subcard .row .n.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .subcard .row .n.curr{color:var(--ink);font-weight:600;}
+  .subcard .row .n.mute{color:var(--mute);}
+  .subcard .row .n.fail{color:var(--ink);font-weight:600;}
+  .subcard .row .st{font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .subcard .row .st.warn{color:var(--warn);}
+  .subcard .row .st.block{color:var(--block);font-weight:600;}
+  .subcard .row .st.pass{color:#2a8f3f;}
+  .subcard .meta{margin-top:14px;font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;justify-content:space-between;}
+  .subcard .retry{color:var(--primary);font-size:13px;letter-spacing:-0.12px;text-decoration:none;}
+
+  /* 10 节点 trace 三态对照 */
+  .pg-tracegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+  .tracecard{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:28px;}
+  .tracecard .h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:18px;letter-spacing:-0.224px;display:flex;justify-content:space-between;align-items:baseline;}
+  .tracecard .h .st{font-size:12px;font-weight:400;color:var(--ink-48);letter-spacing:-0.12px;}
+  .trnode{display:grid;grid-template-columns:14px 1fr auto;gap:12px;padding:7px 0;align-items:center;font-size:13px;letter-spacing:-0.12px;position:relative;}
+  .trnode .stem{position:relative;width:14px;height:100%;}
+  .trnode .stem .dot{position:relative;z-index:2;}
+  .trnode .stem::after{content:"";position:absolute;top:9px;left:2.5px;bottom:-7px;width:1px;background:var(--divider-soft);}
+  .trnode:last-child .stem::after{display:none;}
+  .trnode .nm.curr{color:var(--primary);font-weight:600;}
+  .trnode .nm.done{color:var(--ink-80);}
+  .trnode .nm.mute{color:var(--mute);}
+  .trnode .nm.fail{color:var(--block);font-weight:600;}
+  .trnode .ts{color:var(--ink-48);font-size:12px;font-variant-numeric:tabular-nums;letter-spacing:-0.12px;}
+
+  /* token */
+  .tk-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:32px;}
+  .tk-col h2{font-family:var(--font-display);font-size:28px;font-weight:600;letter-spacing:-0.5px;margin-bottom:6px;}
+  .tk-col .lead{font-size:14px;color:var(--ink-48);margin-bottom:24px;letter-spacing:-0.224px;}
+
+  .swatch{display:grid;grid-template-columns:64px 1fr 1fr 80px;gap:16px;padding:14px 0;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:13px;letter-spacing:-0.12px;}
+  .swatch:last-child{border-bottom:none;}
+  .swatch .ch{height:48px;border-radius:8px;border:1px solid var(--divider-soft);}
+  .swatch .nm{font-weight:600;color:var(--ink);letter-spacing:-0.224px;font-size:14px;}
+  .swatch .nm small{display:block;color:var(--ink-48);font-weight:400;font-size:12px;margin-top:2px;}
+  .swatch .hex{font-family:"SF Mono","PingFang SC",monospace;color:var(--ink-80);font-size:12px;}
+  .swatch .use{color:var(--ink-48);font-size:12px;text-align:right;letter-spacing:-0.12px;}
+
+  .typeladder .row{padding:18px 0;border-bottom:1px solid var(--divider-soft);display:grid;grid-template-columns:160px 1fr 120px;gap:20px;align-items:baseline;}
+  .typeladder .row:last-child{border-bottom:none;}
+  .typeladder .row .lbl{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .typeladder .row .lbl b{display:block;color:var(--ink);font-weight:600;font-size:14px;margin-bottom:2px;letter-spacing:-0.224px;}
+  .typeladder .row .demo{color:var(--ink);}
+  .typeladder .row .meta{text-align:right;font-family:"SF Mono","PingFang SC",monospace;font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  .radiisamples{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px;}
+  .radius-card{background:var(--canvas);border:1px solid var(--hairline);padding:24px 18px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .radius-card .shape{width:80px;height:80px;background:var(--ink);}
+  .radius-card .nm{font-size:14px;font-weight:600;letter-spacing:-0.224px;}
+  .radius-card .v{font-family:"SF Mono","PingFang SC",monospace;font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .radius-card .desc{font-size:12px;color:var(--ink-48);text-align:center;line-height:1.5;letter-spacing:-0.12px;}
+
+  .spacingsamples{display:flex;flex-direction:column;gap:12px;margin-top:8px;}
+  .spacing-row{display:grid;grid-template-columns:80px 1fr 80px;gap:20px;align-items:center;padding:8px 0;font-size:13px;letter-spacing:-0.12px;}
+  .spacing-row .nm{font-weight:600;color:var(--ink);font-size:14px;}
+  .spacing-row .bar{background:var(--ink);height:14px;}
+  .spacing-row .v{font-family:"SF Mono","PingFang SC",monospace;color:var(--ink-48);font-size:12px;text-align:right;}
+
+  .rules-card{margin-top:48px;padding:32px;background:var(--ink);color:#fff;border-radius:18px;display:grid;grid-template-columns:1fr 1fr;gap:48px;}
+  .rules-card h3{font-size:18px;font-weight:600;letter-spacing:-0.374px;margin-bottom:14px;}
+  .rules-card ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#cccccc;letter-spacing:-0.224px;line-height:1.5;}
+  .rules-card ul li::before{content:"·";color:var(--primary-on-dark);margin-right:8px;font-weight:600;}
+  .rules-card ul.dos li::before{content:"✓";color:var(--pass);margin-right:8px;font-weight:600;}
+  .rules-card ul.donts li::before{content:"✗";color:var(--block);margin-right:8px;font-weight:600;}
+</style></head>
+<body><div class="caption"><div><div class="name">14 · 进度条 · 三粒度三态总览</div><div class="sub">顶条 4 步 + 子任务卡 3 态（进行 / 完成 / 失败）+ 10 节点 trace 3 态（pass / warn / block）</div></div><div class="meta"><b>tokens</b> primary / status-pass / status-warn / status-block / status-mute</div><div class="meta"><b>尺寸</b> 顶条 2px · 卡 lg-18 · trace 14px stem</div><div class="meta"><b>状态</b> 全部三态并排对照</div></div><div class="frame">
+<div class="pg-hd">
+  <h1>进度条 · 三粒度三态总览</h1>
+  <div class="lead">用户端中粒度（顶条 + 步骤名条 + 子任务卡）与管理端细粒度（10 节点 trace）的全部状态变体，确保设计一致。</div>
+</div>
+
+<section class="pg-section">
+  <div class="sec-h"><h2>1 · 用户端顶条 + 步骤名条（§7.1）</h2><div class="meta">全局横条 2px · 步骤名条 44px · canvas-parchment 底</div></div>
+
+  <div class="pg-row">
+    <div class="lab">未开始<small>Step 1 待用户填写</small></div>
+    <div class="demo-topbar">
+      <div class="bar"><div class="seg curr"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+      <div class="step"><div class="lead">Step 1 · 案件基本信息</div><div class="tasks"><span class="curr">填写标题</span><span>选择场景</span><span>选择市场</span></div><div class="spacer"></div><div class="right">1 / 5</div></div>
+    </div>
+  </div>
+
+  <div class="pg-row">
+    <div class="lab">进行中<small>正在 Step 3</small></div>
+    <div class="demo-topbar">
+      <div class="bar"><div class="seg done"></div><div class="seg done"></div><div class="seg curr"></div><div class="seg"></div><div class="seg"></div></div>
+      <div class="step"><div class="lead">Step 3 · 资料包预检</div><div class="tasks"><span class="done">识别 SDS</span><span class="done">识别配方</span><span class="curr">校验完整性</span></div><div class="spacer"></div><div class="right">3 / 5 · 4.2s</div></div>
+    </div>
+  </div>
+
+  <div class="pg-row">
+    <div class="lab">最后一步运行中<small>Step 5 子任务执行</small></div>
+    <div class="demo-topbar">
+      <div class="bar"><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg curr"></div></div>
+      <div class="step"><div class="lead">Step 5 · 运行预审</div><div class="tasks"><span class="done">填写标题</span><span class="done">上传文件</span><span class="done">预检完成</span><span class="done">范围确认</span><span class="curr">多 Agent 分析中</span></div><div class="spacer"></div><div class="right">5 / 5 · 1:42</div></div>
+    </div>
+  </div>
+
+  <div class="pg-row">
+    <div class="lab">已完成<small>报告就绪 / 抽屉态</small></div>
+    <div class="demo-topbar">
+      <div class="bar"><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div></div>
+      <div class="step"><div class="lead">已完成 · 报告就绪</div><div class="tasks"><span class="done">全部 5 步</span></div><div class="spacer"></div><div class="right">用时 3:42</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pg-section">
+  <div class="sec-h"><h2>2 · Step 5 子任务卡（§7.1）· 三态对照</h2><div class="meta">运行中 / 完成 / 失败重试</div></div>
+
+  <div class="pg-subgrid">
+    <div class="subcard">
+      <div class="h"><div class="t">运行中</div><div class="p">50%</div></div>
+      <div class="bar"><i style="width:50%;"></i></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">识别物料与组分</div><div class="st">完成 · 8s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">检索匹配规则</div><div class="st">完成 · 22s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">多 Agent 分支分析</div><div class="st">完成 · 47s</div></div>
+      <div class="row"><span class="spinner"></span><div class="n curr">主审合并 · 形成结论草稿</div><div class="st warn">进行中 · 25s</div></div>
+      <div class="row"><span class="dot mute"></span><div class="n mute">交叉质检</div><div class="st">待开始</div></div>
+      <div class="row"><span class="dot mute"></span><div class="n mute">生成客户报告</div><div class="st">待开始</div></div>
+      <div class="meta"><span>已用 1:42</span><span>预计还需 ~1:00</span></div>
+    </div>
+
+    <div class="subcard">
+      <div class="h"><div class="t">已完成</div><div class="p">100%</div></div>
+      <div class="bar"><i style="width:100%;"></i></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">识别物料与组分</div><div class="st pass">完成 · 8s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">检索匹配规则</div><div class="st pass">完成 · 22s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">多 Agent 分支分析</div><div class="st pass">完成 · 47s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">主审合并 · 形成结论草稿</div><div class="st pass">完成 · 1:02</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">交叉质检 · 一致性校验</div><div class="st pass">完成 · 8s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">生成客户报告</div><div class="st pass">完成 · 5s</div></div>
+      <div class="meta"><span>总耗时 3:42</span><a class="link" href="#">查看报告 →</a></div>
+    </div>
+
+    <div class="subcard">
+      <div class="h"><div class="t">单项失败</div><div class="p" style="color:var(--block);">—</div></div>
+      <div class="bar"><i style="width:65%;background:var(--block);"></i></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">识别物料与组分</div><div class="st pass">完成 · 8s</div></div>
+      <div class="row"><span class="dot pass"></span><div class="n done">检索匹配规则</div><div class="st pass">完成 · 22s</div></div>
+      <div class="row"><span class="dot block"></span><div class="n fail">多 Agent 分支分析</div><div class="st block">失败 · 模型超时</div></div>
+      <div class="row"><span class="dot mute"></span><div class="n mute">主审合并</div><div class="st">中止</div></div>
+      <div class="row"><span class="dot mute"></span><div class="n mute">交叉质检</div><div class="st">中止</div></div>
+      <div class="row"><span class="dot mute"></span><div class="n mute">生成客户报告</div><div class="st">中止</div></div>
+      <div class="meta"><a class="retry" href="#">重试该步骤 →</a><a class="link" href="#">查看详情（管理员）</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="pg-section">
+  <div class="sec-h"><h2>3 · 管理端 10 节点 trace（§7.2）· 三态对照</h2><div class="meta">全部 pass / 单点 warn / 中途 block</div></div>
+  <div class="pg-tracegrid">
+    <div class="tracecard">
+      <div class="h"><span>全部通过</span><span class="st">用时 3:42</span></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">加载任务</div><div class="ts">0.1s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析 SDS</div><div class="ts">4.8s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析配方表</div><div class="ts">1.6s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析工艺</div><div class="ts">2.3s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">RAG 召回</div><div class="ts">22.1s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">Rerank 排序</div><div class="ts">3.4s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">Agent 分支</div><div class="ts">47.0s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">主审合并</div><div class="ts">25.2s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">交叉质检</div><div class="ts">8.7s</div></div><div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">生成报告</div><div class="ts">5.9s</div></div>
+    </div>
+
+    <div class="tracecard">
+      <div class="h"><span>含 warn 节点</span><span class="st">主审 1 处冲突</span></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">加载任务</div><div class="ts">0.1s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析 SDS</div><div class="ts">4.8s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析配方表</div><div class="ts">1.6s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析工艺</div><div class="ts">2.3s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot warn"></span></div><div class="nm curr">RAG 召回（当前）</div><div class="ts">22.1s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">Rerank</div><div class="ts">3.4s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">Agent 分支</div><div class="ts">47.0s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot warn"></span></div><div class="nm done">主审合并</div><div class="ts">25.2s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">交叉质检</div><div class="ts">8.7s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">生成报告</div><div class="ts">5.9s</div></div>
+    </div>
+
+    <div class="tracecard">
+      <div class="h"><span>中途阻断</span><span class="st">Agent 节点超时</span></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">加载任务</div><div class="ts">0.1s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析 SDS</div><div class="ts">4.8s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析配方表</div><div class="ts">1.6s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">解析工艺</div><div class="ts">2.3s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">RAG 召回</div><div class="ts">22.1s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot pass"></span></div><div class="nm done">Rerank</div><div class="ts">3.4s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot block"></span></div><div class="nm fail">Agent 分支 · 超时</div><div class="ts">120s</div></div>
+      <div class="trnode"><div class="stem"><span class="dot mute"></span></div><div class="nm mute">主审合并</div><div class="ts">—</div></div>
+      <div class="trnode"><div class="stem"><span class="dot mute"></span></div><div class="nm mute">交叉质检</div><div class="ts">—</div></div>
+      <div class="trnode"><div class="stem"><span class="dot mute"></span></div><div class="nm mute">生成报告</div><div class="ts">—</div></div>
+    </div>
+  </div>
+</section>
+</div></body></html>

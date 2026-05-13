@@ -1,0 +1,365 @@
+/* report.css — 报告 3 态 page-specific 样式。
+   抽自 docs/UI_v01/07-report-default.html / 08-report-drawer.html / 09-report-rerun.html
+   的 `.frame` 内部样式（丢弃 .caption / wizard / dropzone / runcard 等其他 page 样式）。
+   全局 tokens 与 .gnav/.side/.dot/.chip/.cta-* 已在 tokens.css / shell.css 中提供。 */
+
+/* —— 报告页 root —— */
+.report-root { position: relative; min-height: 100%; }
+
+/* —— 状态条 —— */
+.report-root .rpt-status {
+  height: 80px;
+  background: var(--parchment);
+  display: flex;
+  align-items: center;
+  padding: 0 48px;
+  gap: 32px;
+}
+.report-root .rpt-status .h { display: flex; flex-direction: column; gap: 2px; min-width: 280px; }
+.report-root .rpt-status .h .cap { font-size: 12px; color: var(--ink-48); letter-spacing: -0.12px; }
+.report-root .rpt-status .h .ttl {
+  font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.374px;
+}
+.report-root .rpt-status .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; align-items: center; }
+.report-root .rpt-status .conclude {
+  padding: 0 14px; height: 32px; display: inline-flex; align-items: center; gap: 8px;
+  background: var(--canvas); border: 1px solid var(--hairline); border-radius: 9999px;
+  font-size: 13px; color: var(--ink); letter-spacing: -0.224px; font-weight: 600;
+}
+.report-root .rpt-status .actions { display: flex; gap: 10px; align-items: center; }
+
+.report-root .icon-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(0,0,0,0.04); border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink); font-size: 20px; line-height: 1;
+}
+.report-root .icon-btn:active { transform: scale(0.95); }
+
+/* —— 主结论卡 · 页面唯一带 shadow 的元素 —— */
+.report-root .hero-card {
+  margin: 48px 48px 0;
+  padding: 64px 72px;
+  background: var(--canvas);
+  border-radius: 18px;
+  box-shadow: rgba(0,0,0,0.22) 3px 5px 30px;
+  position: relative;
+}
+.report-root .hero-card .tag {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: var(--ink-48); letter-spacing: -0.224px;
+}
+.report-root .hero-card h2 {
+  font-family: var(--font-display);
+  font-size: 48px; font-weight: 600; line-height: 1.07; letter-spacing: -0.5px;
+  color: var(--ink); margin-top: 14px;
+}
+.report-root .hero-card .lead {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 300; line-height: 1.5;
+  color: var(--ink-80); letter-spacing: 0;
+  margin-top: 18px; max-width: 760px;
+}
+.report-root .hero-card .foot {
+  margin-top: 32px; display: flex; gap: 24px; align-items: center;
+  font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px;
+}
+.report-root .hero-card .foot span + span::before {
+  content: "·"; margin-right: 18px; color: var(--mute);
+}
+
+/* mute 变体（待重跑） */
+.report-root .hero-card.mute {
+  background: var(--parchment);
+  box-shadow: none;
+  border: 1px dashed var(--hairline);
+}
+.report-root .hero-card.mute h2 { color: var(--mute); }
+.report-root .hero-card.mute .lead { color: var(--ink-48); }
+
+/* —— 不合规清单 · 边到边交替 tile —— */
+.report-root .findings-h {
+  padding: 64px 48px 0;
+  font-size: 14px; font-weight: 600;
+  color: var(--ink-48); letter-spacing: -0.224px;
+}
+.report-root .findings { margin-top: 24px; }
+.report-root .finding {
+  padding: 56px 96px;
+  display: grid;
+  grid-template-columns: 80px 1fr 140px;
+  gap: 32px;
+  align-items: start;
+}
+.report-root .finding.tile-white { background: var(--canvas); }
+.report-root .finding.tile-parchment { background: var(--parchment); }
+.report-root .finding .num {
+  font-family: var(--font-display);
+  font-size: 48px; font-weight: 600; color: var(--ink);
+  line-height: 1; letter-spacing: -0.5px;
+}
+.report-root .finding .row { display: grid; grid-template-columns: 90px 1fr; gap: 16px; margin-bottom: 18px; }
+.report-root .finding .row:last-child { margin-bottom: 0; }
+.report-root .finding .row .k {
+  font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px; line-height: 1.6; padding-top: 2px;
+}
+.report-root .finding .row .v {
+  font-size: 16px; color: var(--ink); letter-spacing: -0.374px; line-height: 1.6;
+}
+.report-root .finding .row .v .rule-id { font-weight: 600; letter-spacing: -0.374px; }
+.report-root .finding .row .v blockquote {
+  margin: 0; padding: 8px 14px;
+  background: rgba(0,0,0,0.03);
+  border-left: 2px solid var(--hairline);
+  font-size: 15px; color: var(--ink-80);
+}
+.report-root .finding.tile-parchment .row .v blockquote { background: rgba(0,0,0,0.04); }
+.report-root .finding .sev {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+}
+.report-root .finding .sev .chip-sev {
+  padding: 6px 12px; border-radius: 9999px;
+  font-size: 12px; letter-spacing: -0.12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--canvas); border: 1px solid var(--hairline);
+  font-weight: 600;
+}
+.report-root .finding .sev .evi {
+  font-size: 13px; color: var(--primary); letter-spacing: -0.12px;
+  text-decoration: none; background: none; border: none; cursor: pointer; padding: 0;
+  font-family: inherit;
+}
+
+/* —— 报告页脚 —— */
+.report-root .rpt-footer {
+  padding: 64px 48px 80px;
+  font-size: 12px; color: var(--ink-48); letter-spacing: -0.12px;
+  display: flex; justify-content: space-between;
+}
+
+/* —— 抽屉 —— */
+.report-root .drawer {
+  position: absolute; top: 0; right: 0;
+  width: 440px; height: 100%;
+  background: var(--canvas);
+  border-left: 1px solid var(--divider-soft);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 300ms ease;
+  z-index: 5;
+}
+.report-root.drawer-open .drawer { transform: translateX(0); }
+
+.report-root .drawer .dhd {
+  padding: 24px 28px 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.report-root .drawer .dhd .t {
+  font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.374px;
+}
+.report-root .drawer .dhd .x {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 22px; color: var(--ink-48); line-height: 1;
+}
+.report-root .drawer .tabs {
+  display: flex; gap: 0;
+  padding: 16px 28px 0;
+  border-bottom: 1px solid var(--divider-soft);
+  flex-wrap: wrap;
+}
+.report-root .drawer .tabs button {
+  background: transparent; border: none;
+  font: inherit; font-family: var(--font-text);
+  padding: 10px 14px 14px;
+  font-size: 14px; color: var(--ink-48);
+  cursor: pointer; letter-spacing: -0.224px;
+  position: relative; margin-right: 4px;
+}
+.report-root .drawer .tabs button.on { color: var(--ink); font-weight: 600; }
+.report-root .drawer .tabs button.on::after {
+  content: ""; position: absolute;
+  left: 14px; right: 14px; bottom: -1px;
+  height: 2px; background: var(--ink);
+}
+.report-root .drawer .tabs button.admin-only { color: var(--primary); }
+
+.report-root .drawer .panel {
+  flex: 1; overflow: auto;
+  padding: 24px 28px;
+}
+.report-root .drawer .panel.empty {
+  color: var(--ink-48); font-size: 13px; letter-spacing: -0.12px;
+}
+
+.report-root .drawer .tl-node {
+  display: grid;
+  grid-template-columns: 14px 1fr 60px;
+  gap: 14px; align-items: flex-start;
+  padding: 12px 0; cursor: pointer;
+  position: relative;
+}
+.report-root .drawer .tl-node .stem { position: relative; height: 100%; }
+.report-root .drawer .tl-node .stem .dot { position: absolute; top: 6px; left: 4px; }
+.report-root .drawer .tl-node .stem::before {
+  content: ""; position: absolute;
+  top: 18px; left: 7px; bottom: -12px;
+  width: 1px; background: var(--divider-soft);
+}
+.report-root .drawer .tl-node:last-child .stem::before { display: none; }
+.report-root .drawer .tl-node .nm {
+  font-size: 14px; color: var(--ink); font-weight: 600; letter-spacing: -0.224px;
+}
+.report-root .drawer .tl-node .nm small {
+  display: block; color: var(--ink-48);
+  font-weight: 400; font-size: 12px;
+  margin-top: 2px; letter-spacing: -0.12px;
+}
+.report-root .drawer .tl-node .ts {
+  font-size: 12px; color: var(--ink-48);
+  text-align: right; letter-spacing: -0.12px;
+}
+.report-root .drawer .tl-node.curr .nm { color: var(--primary); }
+.report-root .drawer .tl-node.curr-highlight { background: var(--pearl); }
+
+.report-root .drawer .foot-hint {
+  padding: 20px 28px;
+  border-top: 1px solid var(--divider-soft);
+  background: var(--pearl);
+  font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px;
+}
+
+/* admin tabs / footer 默认隐藏，role-admin 才显示 */
+.report-root:not(.role-admin) .admin-only { display: none !important; }
+.report-root:not(.role-admin) .hero-card .foot { display: none; }
+.report-root:not(.role-admin) .finding .sev .evi { display: none; }
+
+/* —— 待重跑 chip / 提示条 —— */
+.report-root .rerun-chip {
+  background: rgba(255,149,0,0.12);
+  color: #a8560a;
+  font-weight: 600;
+  border: 1px solid rgba(255,149,0,0.4);
+}
+.report-root .alert-strip {
+  margin: 32px 48px 0;
+  padding: 20px 28px;
+  background: rgba(255,149,0,0.08);
+  border: 1px solid rgba(255,149,0,0.3);
+  border-radius: 18px;
+  display: flex; align-items: center; gap: 16px;
+}
+.report-root .alert-strip .dot { flex: none; }
+.report-root .alert-strip .t {
+  font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: -0.224px;
+}
+.report-root .alert-strip .h {
+  font-size: 13px; color: var(--ink-48); margin-top: 4px; letter-spacing: -0.12px;
+}
+.report-root .alert-strip .spacer { flex: 1; }
+
+/* —— 待生成态（无 latest_report） —— */
+.report-root .empty-state {
+  padding: 80px 80px;
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 18px;
+  max-width: 760px;
+}
+.report-root .empty-state h1 {
+  font-family: var(--font-display);
+  font-size: 40px; font-weight: 600;
+  line-height: 1.1; letter-spacing: -0.5px;
+  color: var(--ink);
+}
+.report-root .empty-state p {
+  font-size: 17px; color: var(--ink-48); letter-spacing: -0.374px;
+}
+.report-root .empty-state .actions {
+  margin-top: 16px; display: flex; gap: 12px; align-items: center;
+}
+
+/* —— Rerun 进行中 subtask —— */
+.report-root .runcard {
+  margin: 32px 48px 0;
+  padding: 32px 40px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+}
+.report-root .runcard .total {
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px;
+}
+.report-root .runcard .total .t {
+  font-size: 21px; font-weight: 600; color: var(--ink); letter-spacing: -0.374px;
+}
+.report-root .runcard .total .pct {
+  font-family: var(--font-display);
+  font-size: 34px; font-weight: 600;
+  color: var(--ink); letter-spacing: -0.5px; line-height: 1;
+}
+.report-root .runcard .bar {
+  height: 4px; background: var(--divider-soft);
+  border-radius: 9999px; overflow: hidden; margin-bottom: 24px;
+}
+.report-root .runcard .bar > i {
+  display: block; height: 100%; background: var(--primary);
+  width: 30%;
+  animation: rcr-progress 1.6s ease-in-out infinite alternate;
+}
+@keyframes rcr-progress { from { width: 12%; } to { width: 80%; } }
+.report-root .runcard .sub-h {
+  font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px; margin-bottom: 12px;
+}
+.report-root .runcard .row {
+  display: grid; grid-template-columns: 14px 1fr 120px;
+  gap: 14px; padding: 12px 0;
+  border-bottom: 1px solid var(--divider-soft);
+  align-items: center;
+  font-size: 14px; letter-spacing: -0.224px;
+}
+.report-root .runcard .row:last-child { border-bottom: none; }
+.report-root .runcard .row .n.done {
+  color: var(--ink-48); text-decoration: line-through; text-decoration-color: var(--ink-48);
+}
+.report-root .runcard .row .n.curr { color: var(--ink); font-weight: 600; }
+.report-root .runcard .row .n.mute { color: var(--mute); }
+.report-root .runcard .row .st {
+  text-align: right; font-size: 13px; color: var(--ink-48); letter-spacing: -0.12px;
+}
+.report-root .runcard .row .st.warn { color: var(--warn); }
+.report-root .spinner {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 1.5px solid var(--warn);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: rcr-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+@keyframes rcr-spin { to { transform: rotate(360deg); } }
+
+/* —— 错误态 —— */
+.report-root .err-state {
+  padding: 80px;
+  color: var(--block);
+  font-size: 17px; letter-spacing: -0.374px;
+}
+.report-root .err-state h1 {
+  font-family: var(--font-display);
+  font-size: 32px; font-weight: 600;
+  color: var(--ink); margin-bottom: 12px; letter-spacing: -0.5px;
+}
+.report-root .err-state p { color: var(--ink-48); margin-bottom: 24px; }
+
+/* 当清单为空（合规态） */
+.report-root .findings-empty {
+  margin: 32px 48px;
+  padding: 28px 32px;
+  background: var(--parchment);
+  border-radius: 18px;
+  color: var(--ink-48);
+  font-size: 14px; letter-spacing: -0.224px;
+}
+
+/* 待重跑态下的灰化 */
+.report-root.state-rerun .findings { opacity: 0.45; filter: saturate(0.4); }
+.report-root.state-rerun .findings-h { color: #bbb; }

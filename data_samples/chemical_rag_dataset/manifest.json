@@ -150,6 +150,58 @@
       "expected_verdict": "不合规",
       "expected_review": false,
       "expected_rules": ["enterprise_redline_benzene"]
+    },
+    {
+      "case_id": "coatings_demo_case_pass",
+      "title": "水性环保木器面漆 AQ-Wood-201 准入预审（涂料/油墨 Demo）",
+      "scenario_tags": ["水性涂料", "SDS 16 章齐全", "VOC 低于限值", "无 SVHC 命中"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "upload_samples/演示1_合规通过_水性木器面漆/sds.md",
+      "formula_path": "upload_samples/演示1_合规通过_水性木器面漆/formula.md",
+      "process_path": "upload_samples/演示1_合规通过_水性木器面漆/process.md",
+      "expected_verdict": "合规",
+      "expected_customer_verdict": "pass",
+      "expected_review": false,
+      "expected_rules": ["sds_complete", "formula_components_known", "storage_compatible"]
+    },
+    {
+      "case_id": "coatings_demo_case_needs_review",
+      "title": "环氧地坪面漆 EP-Floor-310 SVHC 边界预审（涂料/油墨 Demo）",
+      "scenario_tags": ["双酚 A 0.08%", "SVHC 阈值边界", "毒理学暂未测试", "VOC 接近 CARB 限值"],
+      "target_markets": ["EU", "US", "CN"],
+      "sds_path": "upload_samples/演示2_需复核_环氧地坪面漆/sds.md",
+      "formula_path": "upload_samples/演示2_需复核_环氧地坪面漆/formula.md",
+      "process_path": "upload_samples/演示2_需复核_环氧地坪面漆/process.md",
+      "expected_verdict": "复核",
+      "expected_customer_verdict": "needs_review",
+      "expected_review": true,
+      "expected_rules": ["svhc_threshold_match", "sds_missing_sections"]
+    },
+    {
+      "case_id": "coatings_demo_case_not_approved",
+      "title": "高反应活性氧化清洗 / 油墨稀释剂 RX-Solvent-880 预审（涂料/油墨 Demo）",
+      "scenario_tags": ["氧化剂与可燃液体同釜", "VOC 350 g/L 超标", "禁忌组合", "不建议准入"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "upload_samples/演示3_不合规_氧化清洗剂/sds.md",
+      "formula_path": "upload_samples/演示3_不合规_氧化清洗剂/formula.md",
+      "process_path": "upload_samples/演示3_不合规_氧化清洗剂/process.md",
+      "expected_verdict": "不合规",
+      "expected_customer_verdict": "not_approved",
+      "expected_review": false,
+      "expected_rules": ["incompatibility_oxidizer_flammable", "voc_limit_exceeded", "flammable_storage_missing"]
+    },
+    {
+      "case_id": "coatings_demo_case_needs_supplement",
+      "title": "油墨基础树脂 ResinX-12 资料补充（涂料/油墨 Demo）",
+      "scenario_tags": ["配方多项缺 CAS", "工艺关键温度缺失", "SDS 第 7 章空白", "需补充资料"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "upload_samples/演示4_需补件_油墨基础树脂/sds.md",
+      "formula_path": "upload_samples/演示4_需补件_油墨基础树脂/formula.md",
+      "process_path": "upload_samples/演示4_需补件_油墨基础树脂/process.md",
+      "expected_verdict": "复核",
+      "expected_customer_verdict": "needs_supplement",
+      "expected_review": true,
+      "expected_rules": ["formula_cas_missing", "process_parameters_missing", "sds_missing_sections"]
     }
   ]
 }

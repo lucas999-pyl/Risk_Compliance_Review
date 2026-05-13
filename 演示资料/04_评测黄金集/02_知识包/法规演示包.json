@@ -1,0 +1,38 @@
+{
+  "pack_id": "demo_regulatory_pack",
+  "version": "1.0.0",
+  "synthetic": true,
+  "notes": "用于软件测试的合成来源支撑片段。URL 指向官方来源家族，但 content 是虚构演示内容。",
+  "sources": [
+    {
+      "title": "中国危险化学品目录演示摘录",
+      "jurisdiction": "CN",
+      "source_type": "official_law",
+      "source_url": "https://www.mem.gov.cn/gk/gwgg/agwzlfl/gfxwj/2015/201509/t20150902_242909.shtml",
+      "version": "2015-demo",
+      "effective_date": "2015-09-02",
+      "license_note": "测试数据使用的合成摘录。生产环境必须由客户导入授权来源文本。",
+      "content": "演示中国来源支持筛查数据：乙醇 CAS 64-17-5 和丙酮 CAS 67-64-1 在本测试包中按危险化学品命中处理。所有 finding 均需人工复核，并结合授权的中国目录、SDS 和标签义务确认。"
+    },
+    {
+      "title": "欧盟 REACH/SVHC 演示摘录",
+      "jurisdiction": "EU",
+      "source_type": "official_registry",
+      "source_url": "https://www.echa.europa.eu/en/candidate-list-table",
+      "version": "2026-01-demo",
+      "effective_date": "2026-01-01",
+      "license_note": "测试数据使用的合成摘录。生产环境必须由客户导入当前 ECHA 数据。",
+      "content": "演示欧盟来源支持筛查数据：双酚A CAS 80-05-7 在本测试包中按候选清单 SVHC 命中处理，阈值为达到或超过 0.1 percent w/w。乙醇 CAS 64-17-5 和丙酮 CAS 67-64-1 在本演示包中作为未命中 SVHC 的对照项。"
+    },
+    {
+      "title": "美国 TSCA/HCS 演示摘录",
+      "jurisdiction": "US",
+      "source_type": "official_registry",
+      "source_url": "https://www.epa.gov/tsca-inventory",
+      "version": "2026-01-demo",
+      "effective_date": "2026-01-01",
+      "license_note": "测试数据使用的合成摘录。生产环境必须由客户导入授权 EPA/OSHA 来源数据。",
+      "content": "演示美国来源支持筛查数据：乙醇 CAS 64-17-5 和丙酮 CAS 67-64-1 在本演示 TSCA 清单摘录中为 active。该演示场景下，OSHA HCS 需要进行 SDS 和标签危害沟通审查。"
+    }
+  ]
+}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>04 · Wizard Step 3</title><style>
+  :root{
+    --primary:#0066cc;--primary-focus:#0071e3;
+    --ink:#1d1d1f;--ink-80:#333;--ink-48:#7a7a7a;--mute:#8e8e93;
+    --hairline:#e0e0e0;--divider-soft:#f0f0f0;
+    --canvas:#fff;--parchment:#f5f5f7;--pearl:#fafafc;
+    --tile-dark:#272729;--black:#000;
+    --pass:#34c759;--warn:#ff9500;--block:#ff3b30;
+    --font-display:"PingFang SC","SF Pro Display",system-ui,-apple-system,sans-serif;
+    --font-text:"PingFang SC","SF Pro Text",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font-text);font-size:16px;line-height:1.6;color:var(--ink);background:var(--parchment);-webkit-font-smoothing:antialiased;}
+  .caption{width:1440px;margin:0 auto;padding:20px 32px;background:var(--ink);color:#fff;display:grid;grid-template-columns:1fr auto auto auto;gap:32px;align-items:baseline;font-size:13px;line-height:1.4;letter-spacing:-0.08px;}
+  .caption .name{font-weight:600;font-size:14px;}
+  .caption .meta{color:#cccccc;}
+  .caption .meta b{color:#fff;font-weight:600;margin-right:6px;}
+  .caption .sub{color:#999;margin-top:4px;}
+  .frame{width:1440px;margin:0 auto;background:var(--canvas);display:grid;grid-template-columns:240px 1fr;grid-template-rows:44px 2px 44px 1fr;grid-template-areas:"nav nav" "pbar pbar" "stepbar stepbar" "side main";min-height:900px;}
+  .frame.no-progress{grid-template-rows:44px 1fr;grid-template-areas:"nav nav" "side main";}
+  .gnav{grid-area:nav;background:var(--black);color:#fff;height:44px;display:flex;align-items:center;padding:0 24px;gap:24px;font-size:12px;letter-spacing:-0.12px;}
+  .gnav .brand{font-weight:600;letter-spacing:-0.224px;font-size:13px;}
+  .gnav .crumb{color:#cccccc;}
+  .gnav .crumb b{color:#fff;font-weight:400;}
+  .gnav .spacer{flex:1;}
+  .gnav .switch{display:flex;background:rgba(255,255,255,0.08);border-radius:9999px;padding:3px;gap:0;}
+  .gnav .switch button{background:transparent;color:#cccccc;border:none;font:inherit;font-family:var(--font-text);padding:5px 14px;border-radius:9999px;cursor:pointer;letter-spacing:-0.12px;}
+  .gnav .switch button.on{background:var(--canvas);color:var(--ink);}
+  .gnav .me{color:#cccccc;}
+  .pbar{grid-area:pbar;background:var(--hairline);height:2px;display:flex;}
+  .pbar .seg{flex:1;background:var(--hairline);}
+  .pbar .seg.done{background:var(--primary);}
+  .pbar .seg.curr{background:var(--primary);opacity:0.5;}
+  .stepbar{grid-area:stepbar;background:var(--parchment);height:44px;display:flex;align-items:center;padding:0 32px;gap:24px;font-size:14px;letter-spacing:-0.224px;}
+  .stepbar .lead{font-weight:600;color:var(--ink);}
+  .stepbar .tasks{color:var(--mute);display:flex;gap:14px;}
+  .stepbar .tasks span.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .stepbar .tasks span.curr{color:var(--ink);}
+  .stepbar .spacer{flex:1;}
+  .stepbar .right{color:var(--ink-48);}
+  .side{grid-area:side;background:var(--pearl);border-right:1px solid var(--divider-soft);padding:24px 16px;display:flex;flex-direction:column;gap:6px;}
+  .side h6{font-size:12px;font-weight:400;letter-spacing:-0.12px;color:var(--ink-48);text-transform:uppercase;padding:0 12px 8px;}
+  .case-item{padding:12px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px;}
+  .case-item.active{background:var(--canvas);}
+  .case-item .title{font-size:14px;font-weight:600;letter-spacing:-0.224px;color:var(--ink);line-height:1.4;}
+  .case-item .sub{font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none;}
+  .dot.lg{width:10px;height:10px;}
+  .dot.pass{background:var(--pass);}.dot.warn{background:var(--warn);}.dot.block{background:var(--block);}.dot.mute{background:var(--mute);}
+  .main{grid-area:main;background:var(--canvas);}
+  .cta-primary{background:var(--primary);color:#fff;border:none;font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:11px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;white-space:nowrap;}
+  .cta-primary:active{transform:scale(0.97);}
+  .cta-primary.lg{font-family:var(--font-text);font-size:18px;font-weight:300;padding:14px 32px;}
+  .cta-primary[disabled],.cta-primary.disabled{background:#cfd0d3;color:#fff;cursor:not-allowed;}
+  .cta-ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:10px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;}
+  .cta-dark{background:var(--ink);color:#fff;border:none;font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 15px;border-radius:8px;cursor:pointer;}
+  .cta-pearl{background:var(--pearl);color:var(--ink-80);border:1px solid var(--divider-soft);font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .link{color:var(--primary);text-decoration:none;font-size:14px;letter-spacing:-0.224px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;background:var(--parchment);border-radius:9999px;font-size:12px;color:var(--ink-80);letter-spacing:-0.12px;line-height:1;}
+  .chip.strong{background:var(--canvas);border:1px solid var(--hairline);}
+  .chip.bare{background:transparent;padding:0;}
+
+  /* wizard 主区 */
+  .wzbody{padding:64px 80px 80px;max-width:1100px;}
+  .wzbody h1{font-family:var(--font-display);font-size:40px;font-weight:600;line-height:1.1;letter-spacing:-0.5px;}
+  .wzbody .lead{font-size:17px;color:var(--ink-48);margin-top:12px;letter-spacing:-0.374px;max-width:680px;}
+  .wzbody section{margin-top:48px;}
+  .field{margin-bottom:32px;}
+  .field label{display:block;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:10px;}
+  .field .hint{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:10px;}
+  .field input[type=text]{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;}
+  .field input[type=text]:focus{outline:2px solid var(--primary-focus);outline-offset:-2px;border-color:transparent;}
+  .field .select{position:relative;}
+  .field .select select{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;appearance:none;}
+  .field .select::after{content:"⌄";position:absolute;right:18px;top:14px;color:var(--ink-48);font-size:14px;}
+  .toggle-chips{display:flex;gap:12px;flex-wrap:wrap;}
+  .toggle{padding:10px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:9999px;cursor:pointer;font-size:14px;color:var(--ink);letter-spacing:-0.224px;}
+  .toggle.on{border-color:var(--primary);color:var(--primary);background:rgba(0,102,204,0.04);}
+
+  .wzfoot{display:flex;justify-content:space-between;align-items:center;padding:24px 80px;border-top:1px solid var(--divider-soft);background:var(--canvas);}
+  .wzfoot .step-tag{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* dropzone */
+  .dropzone{margin-top:16px;border:1px dashed var(--hairline);border-radius:18px;background:var(--parchment);padding:64px 32px;text-align:center;}
+  .dropzone .big{font-size:40px;color:var(--ink-48);line-height:1;font-weight:300;}
+  .dropzone .t{font-size:21px;font-weight:600;color:var(--ink);margin-top:18px;letter-spacing:-0.374px;}
+  .dropzone .h{font-size:14px;color:var(--ink-48);margin-top:8px;letter-spacing:-0.12px;}
+  .dropzone .actions{margin-top:24px;display:flex;justify-content:center;gap:12px;}
+
+  .uplist{margin-top:24px;display:flex;flex-direction:column;gap:10px;}
+  .uprow{display:grid;grid-template-columns:24px 1fr 100px 130px 80px;gap:16px;align-items:center;padding:14px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font-size:14px;letter-spacing:-0.224px;}
+  .uprow .name{color:var(--ink);font-weight:600;}
+  .uprow .name small{display:block;color:var(--ink-48);font-weight:400;font-size:12px;margin-top:2px;}
+  .uprow .size{color:var(--ink-48);text-align:right;}
+  .uprow .progressbar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;}
+  .uprow .progressbar > i{display:block;height:100%;background:var(--primary);}
+  .uprow .state{text-align:right;color:var(--ink-48);font-size:13px;}
+  .uprow .state.done{color:var(--pass);}
+  .uprow .icon-doc{width:24px;height:24px;border-radius:4px;background:var(--parchment);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-48);font-weight:600;}
+
+  /* metric cards */
+  .mc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .mc{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:8px;}
+  .mc .lab{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:8px;}
+  .mc .num{font-family:var(--font-display);font-size:48px;font-weight:600;line-height:1;letter-spacing:-0.5px;color:var(--ink);margin-top:8px;}
+  .mc .num.mute{color:var(--mute);}
+  .mc .desc{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* file ident row */
+  .file-ident{display:grid;grid-template-columns:24px 1fr 140px 90px 1fr;gap:16px;align-items:center;padding:18px 18px;border-bottom:1px solid var(--divider-soft);font-size:14px;letter-spacing:-0.224px;}
+  .file-ident:last-child{border-bottom:none;}
+  .file-ident .name{color:var(--ink);font-weight:600;}
+  .file-ident .desc{color:var(--ink-48);font-size:13px;}
+  .file-ident .pct{font-variant-numeric:tabular-nums;color:var(--ink-48);text-align:right;}
+
+  /* 范围清单 */
+  .scope-group{margin-bottom:32px;}
+  .scope-group h3{font-size:14px;font-weight:600;color:var(--ink-48);text-transform:none;letter-spacing:-0.224px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
+  .scope-group h3 .ct{font-weight:400;color:var(--mute);}
+  .scope-row{display:grid;grid-template-columns:24px 1fr 220px;gap:16px;padding:14px 18px;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .scope-row:hover{background:var(--pearl);}
+  .scope-row.recommended{background:rgba(0,102,204,0.03);}
+  .scope-row .cb{width:18px;height:18px;border:1.5px solid var(--hairline);border-radius:4px;background:var(--canvas);display:inline-block;position:relative;}
+  .scope-row.on .cb{background:var(--primary);border-color:var(--primary);}
+  .scope-row.on .cb::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);}
+  .scope-row .lbl{color:var(--ink);}
+  .scope-row .lbl small{display:block;color:var(--ink-48);font-size:12px;font-weight:400;margin-top:2px;letter-spacing:-0.12px;}
+  .scope-row .rule{color:var(--ink-48);font-size:12px;font-family:var(--font-text);text-align:right;letter-spacing:-0.12px;}
+
+  /* 运行预审 subtask 卡 */
+  .runcard{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:32px 40px;margin-top:32px;}
+  .runcard .total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;}
+  .runcard .total .t{font-size:21px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .runcard .total .pct{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--ink);letter-spacing:-0.5px;line-height:1;}
+  .runcard .bar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;margin-bottom:24px;}
+  .runcard .bar > i{display:block;height:100%;background:var(--primary);}
+  .runcard .sub-h{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:12px;}
+  .runcard .row{display:grid;grid-template-columns:14px 1fr 120px;gap:14px;padding:12px 0;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .runcard .row:last-child{border-bottom:none;}
+  .runcard .row .dot.lg{margin:0;}
+  .runcard .row .n.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .runcard .row .n.curr{color:var(--ink);font-weight:600;}
+  .runcard .row .n.mute{color:var(--mute);}
+  .runcard .row .st{text-align:right;font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .runcard .row .st.warn{color:var(--warn);}
+  .spinner{display:inline-block;width:10px;height:10px;border:1.5px solid var(--warn);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:middle;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  /* 阻断/补件卡 */
+  .alert-card{margin-top:32px;padding:24px;border:1px solid var(--hairline);border-radius:18px;background:var(--canvas);}
+  .alert-card .head{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:14px;}
+  .alert-card ul{list-style:none;padding:0;margin:0;}
+  .alert-card li{padding:10px 0;border-bottom:1px solid var(--divider-soft);font-size:14px;color:var(--ink-80);letter-spacing:-0.224px;}
+  .alert-card li:last-child{border-bottom:none;}
+  .alert-card li b{font-weight:600;color:var(--ink);}
+  .alert-card .act{margin-top:14px;display:flex;justify-content:flex-end;}
+</style></head>
+<body>
+<div class="caption">
+  <div><div class="name">04 · Wizard Step 3 · 预检结论</div><div class="sub">4 张 metric 卡（store-utility-card 形态）· 文件识别明细 · 受限阻断卡</div></div>
+  <div class="meta"><b>tokens</b> mc / status-pass / status-warn / status-block</div>
+  <div class="meta"><b>尺寸</b> 主区 1100 · 卡 lg-18 · num 48</div>
+  <div class="meta"><b>状态</b> 阻断 1 项</div>
+</div><div class="frame">
+<nav class="gnav">
+    <div class="brand">化工合规预审</div>
+    <div class="crumb">·&nbsp;&nbsp;<b>新 Case · CASE-2026-0143</b></div>
+    <div class="spacer"></div>
+    <div class="switch"><button class="on">客户预审视角</button><button>管理端视角</button></div>
+    <div class="me">徐钰</div>
+  </nav>
+<div class="pbar"><div class="seg done"></div><div class="seg done"></div><div class="seg curr"></div><div class="seg "></div><div class="seg "></div></div>
+<div class="stepbar"><div class="lead">Step 3 · 资料包预检</div><div class="tasks"><span class="done">填写标题</span><span class="done">上传文件</span><span class="curr">识别 SDS · 识别配方 · 校验完整性</span></div><div class="spacer"></div><div class="right">3 / 5 · 预检耗时 4.2s</div></div>
+<aside class="side">
+    <h6>Case · 7</h6>
+    <div class="case-item active">
+      <div class="title">（草稿）新 Case</div>
+      <div class="sub"><span class="dot mute"></span>Wizard 进行中 · 0143</div>
+    </div>
+    <div class="case-item"><div class="title">某丙烯酸酯涂料 · 出口欧盟登记</div><div class="sub"><span class="dot warn"></span>需复核 · 0142</div></div>
+    <div class="case-item"><div class="title">水性环氧地坪 SDS 复核</div><div class="sub"><span class="dot pass"></span>已完成 · 0141</div></div>
+    <div class="case-item"><div class="title">含氟表面活性剂 · 配方合规</div><div class="sub"><span class="dot warn"></span>Step 4 · 0140</div></div>
+    <div class="case-item"><div class="title">某粉末涂料原料替换</div><div class="sub"><span class="dot block"></span>缺件待补 · 0139</div></div>
+    <div class="case-item"><div class="title">车用聚氨酯涂料 · 美国市场</div><div class="sub"><span class="dot pass"></span>已完成 · 0138</div></div>
+    <div class="case-item"><div class="title">2K 木器漆 · 国内备案</div><div class="sub"><span class="dot mute"></span>Step 2 · 0137</div></div>
+  </aside>
+<main class="main">
+  <div class="wzbody">
+    <h1>资料预检结论</h1>
+    <div class="lead">系统已识别全部文件类型并校验完整性；下方四张卡是这一步的产出。</div>
+
+    <section>
+      <div class="mc-grid">
+        <div class="mc">
+          <div class="lab"><span class="dot lg pass"></span>已识别</div>
+          <div class="num">3</div>
+          <div class="desc">SDS · 配方表 · 工艺说明 各 1 份</div>
+        </div>
+        <div class="mc">
+          <div class="lab"><span class="dot lg mute"></span>需补件</div>
+          <div class="num mute">0</div>
+          <div class="desc">本场景下所需文件类型已齐</div>
+        </div>
+        <div class="mc">
+          <div class="lab"><span class="dot lg pass"></span>可直接检查</div>
+          <div class="num">6</div>
+          <div class="desc">物料 2 · 工艺 1 · 法规适配 3</div>
+        </div>
+        <div class="mc">
+          <div class="lab"><span class="dot lg block"></span>受限阻断</div>
+          <div class="num">1</div>
+          <div class="desc">检出 1 种 EU 受限物料，详见下方</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink-48);letter-spacing:-0.224px;margin-bottom:12px;">已上传文件 · 识别结果</h3>
+      <div style="background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;overflow:hidden;">
+        <div class="file-ident">
+          <span class="icon-doc">PDF</span>
+          <div><div class="name">acrylic-coating-SDS-v3.pdf</div><div class="desc">SDS · 安全技术说明书</div></div>
+          <span class="chip strong">类型 · SDS</span>
+          <div class="pct">置信 98%</div>
+          <div class="desc">16 节段落齐全 · 含 GHS 分类与组分声明</div>
+        </div>
+        <div class="file-ident">
+          <span class="icon-doc">XLS</span>
+          <div><div class="name">formula-spec-2025Q4.xlsx</div><div class="desc">配方 / 成分明细表</div></div>
+          <span class="chip strong">类型 · 配方表</span>
+          <div class="pct">置信 95%</div>
+          <div class="desc">12 项组分 · 含 CAS 与百分比 · 字段完整</div>
+        </div>
+        <div class="file-ident">
+          <span class="icon-doc">DOC</span>
+          <div><div class="name">process-flow-emulsion.docx</div><div class="desc">工艺说明 / 流程图</div></div>
+          <span class="chip strong">类型 · 工艺</span>
+          <div class="pct">置信 91%</div>
+          <div class="desc">乳液聚合工艺 · 含温压参数 · 缺一处溶剂用量</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="alert-card">
+        <div class="head"><span class="dot lg block"></span>受限物料阻断提示 · 1 项</div>
+        <ul>
+          <li><b>组分 #07 · 全氟辛酸（PFOA · CAS 335-67-1）</b> ｜ 在 EU 市场已列入 REACH 附录 XVII 限制清单，不能进入下一步审查。建议替换为短链氟羧酸或非氟替代体系。</li>
+        </ul>
+        <div class="act">
+          <a class="link" href="#">查看原文匹配 →</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wzfoot">
+    <button class="cta-pearl">← 上一步</button>
+    <div class="step-tag">已知悉阻断项后仍可继续，将在报告中标记</div>
+    <button class="cta-primary">下一步 · 选择审查范围 →</button>
+  </div>
+</main></div></body></html>

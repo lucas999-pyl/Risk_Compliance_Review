@@ -1,0 +1,10 @@
+ .env.example                               |   26 +-
+ backend/app/ai_clients.py                  |   14 +-
+ backend/app/chemical_rag.py                |    6 +-
+ backend/app/factory.py                     |   92 +-
+ backend/app/settings.py                    |   16 +
+ backend/app/static/index.html              | 2259 +---------------------------
+ backend/tests/test_customer_review_flow.py |    2 +-
+ backend/tests/test_static_workbench.py     |   26 +-
+ backend/tests/test_technology_demo.py      |    2 +-
+ 9 files changed, 170 insertions(+), 2273 deletions(-)

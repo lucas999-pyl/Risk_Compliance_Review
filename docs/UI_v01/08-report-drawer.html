@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>08 · 报告 抽屉打开</title><style>
+  :root{
+    --primary:#0066cc;--primary-focus:#0071e3;
+    --ink:#1d1d1f;--ink-80:#333;--ink-48:#7a7a7a;--mute:#8e8e93;
+    --hairline:#e0e0e0;--divider-soft:#f0f0f0;
+    --canvas:#fff;--parchment:#f5f5f7;--pearl:#fafafc;
+    --tile-dark:#272729;--black:#000;
+    --pass:#34c759;--warn:#ff9500;--block:#ff3b30;
+    --font-display:"PingFang SC","SF Pro Display",system-ui,-apple-system,sans-serif;
+    --font-text:"PingFang SC","SF Pro Text",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font-text);font-size:16px;line-height:1.6;color:var(--ink);background:var(--parchment);-webkit-font-smoothing:antialiased;}
+  .caption{width:1440px;margin:0 auto;padding:20px 32px;background:var(--ink);color:#fff;display:grid;grid-template-columns:1fr auto auto auto;gap:32px;align-items:baseline;font-size:13px;line-height:1.4;letter-spacing:-0.08px;}
+  .caption .name{font-weight:600;font-size:14px;}
+  .caption .meta{color:#cccccc;}
+  .caption .meta b{color:#fff;font-weight:600;margin-right:6px;}
+  .caption .sub{color:#999;margin-top:4px;}
+  .frame{width:1440px;margin:0 auto;background:var(--canvas);display:grid;grid-template-columns:240px 1fr;grid-template-rows:44px 2px 44px 1fr;grid-template-areas:"nav nav" "pbar pbar" "stepbar stepbar" "side main";min-height:900px;}
+  .frame.no-progress{grid-template-rows:44px 1fr;grid-template-areas:"nav nav" "side main";}
+  .gnav{grid-area:nav;background:var(--black);color:#fff;height:44px;display:flex;align-items:center;padding:0 24px;gap:24px;font-size:12px;letter-spacing:-0.12px;}
+  .gnav .brand{font-weight:600;letter-spacing:-0.224px;font-size:13px;}
+  .gnav .crumb{color:#cccccc;}
+  .gnav .crumb b{color:#fff;font-weight:400;}
+  .gnav .spacer{flex:1;}
+  .gnav .switch{display:flex;background:rgba(255,255,255,0.08);border-radius:9999px;padding:3px;gap:0;}
+  .gnav .switch button{background:transparent;color:#cccccc;border:none;font:inherit;font-family:var(--font-text);padding:5px 14px;border-radius:9999px;cursor:pointer;letter-spacing:-0.12px;}
+  .gnav .switch button.on{background:var(--canvas);color:var(--ink);}
+  .gnav .me{color:#cccccc;}
+  .pbar{grid-area:pbar;background:var(--hairline);height:2px;display:flex;}
+  .pbar .seg{flex:1;background:var(--hairline);}
+  .pbar .seg.done{background:var(--primary);}
+  .pbar .seg.curr{background:var(--primary);opacity:0.5;}
+  .stepbar{grid-area:stepbar;background:var(--parchment);height:44px;display:flex;align-items:center;padding:0 32px;gap:24px;font-size:14px;letter-spacing:-0.224px;}
+  .stepbar .lead{font-weight:600;color:var(--ink);}
+  .stepbar .tasks{color:var(--mute);display:flex;gap:14px;}
+  .stepbar .tasks span.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .stepbar .tasks span.curr{color:var(--ink);}
+  .stepbar .spacer{flex:1;}
+  .stepbar .right{color:var(--ink-48);}
+  .side{grid-area:side;background:var(--pearl);border-right:1px solid var(--divider-soft);padding:24px 16px;display:flex;flex-direction:column;gap:6px;}
+  .side h6{font-size:12px;font-weight:400;letter-spacing:-0.12px;color:var(--ink-48);text-transform:uppercase;padding:0 12px 8px;}
+  .case-item{padding:12px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px;}
+  .case-item.active{background:var(--canvas);}
+  .case-item .title{font-size:14px;font-weight:600;letter-spacing:-0.224px;color:var(--ink);line-height:1.4;}
+  .case-item .sub{font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none;}
+  .dot.lg{width:10px;height:10px;}
+  .dot.pass{background:var(--pass);}.dot.warn{background:var(--warn);}.dot.block{background:var(--block);}.dot.mute{background:var(--mute);}
+  .main{grid-area:main;background:var(--canvas);}
+  .cta-primary{background:var(--primary);color:#fff;border:none;font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:11px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;white-space:nowrap;}
+  .cta-primary:active{transform:scale(0.97);}
+  .cta-primary.lg{font-family:var(--font-text);font-size:18px;font-weight:300;padding:14px 32px;}
+  .cta-primary[disabled],.cta-primary.disabled{background:#cfd0d3;color:#fff;cursor:not-allowed;}
+  .cta-ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);font-family:var(--font-text);font-size:16px;letter-spacing:-0.374px;padding:10px 22px;border-radius:9999px;cursor:pointer;line-height:1.24;}
+  .cta-dark{background:var(--ink);color:#fff;border:none;font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 15px;border-radius:8px;cursor:pointer;}
+  .cta-pearl{background:var(--pearl);color:var(--ink-80);border:1px solid var(--divider-soft);font-family:var(--font-text);font-size:14px;letter-spacing:-0.224px;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .link{color:var(--primary);text-decoration:none;font-size:14px;letter-spacing:-0.224px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;background:var(--parchment);border-radius:9999px;font-size:12px;color:var(--ink-80);letter-spacing:-0.12px;line-height:1;}
+  .chip.strong{background:var(--canvas);border:1px solid var(--hairline);}
+  .chip.bare{background:transparent;padding:0;}
+
+  /* wizard 主区 */
+  .wzbody{padding:64px 80px 80px;max-width:1100px;}
+  .wzbody h1{font-family:var(--font-display);font-size:40px;font-weight:600;line-height:1.1;letter-spacing:-0.5px;}
+  .wzbody .lead{font-size:17px;color:var(--ink-48);margin-top:12px;letter-spacing:-0.374px;max-width:680px;}
+  .wzbody section{margin-top:48px;}
+  .field{margin-bottom:32px;}
+  .field label{display:block;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:10px;}
+  .field .hint{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:10px;}
+  .field input[type=text]{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;}
+  .field input[type=text]:focus{outline:2px solid var(--primary-focus);outline-offset:-2px;border-color:transparent;}
+  .field .select{position:relative;}
+  .field .select select{width:100%;height:48px;padding:0 16px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font:inherit;font-family:var(--font-text);font-size:16px;color:var(--ink);letter-spacing:-0.374px;appearance:none;}
+  .field .select::after{content:"⌄";position:absolute;right:18px;top:14px;color:var(--ink-48);font-size:14px;}
+  .toggle-chips{display:flex;gap:12px;flex-wrap:wrap;}
+  .toggle{padding:10px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:9999px;cursor:pointer;font-size:14px;color:var(--ink);letter-spacing:-0.224px;}
+  .toggle.on{border-color:var(--primary);color:var(--primary);background:rgba(0,102,204,0.04);}
+
+  .wzfoot{display:flex;justify-content:space-between;align-items:center;padding:24px 80px;border-top:1px solid var(--divider-soft);background:var(--canvas);}
+  .wzfoot .step-tag{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* dropzone */
+  .dropzone{margin-top:16px;border:1px dashed var(--hairline);border-radius:18px;background:var(--parchment);padding:64px 32px;text-align:center;}
+  .dropzone .big{font-size:40px;color:var(--ink-48);line-height:1;font-weight:300;}
+  .dropzone .t{font-size:21px;font-weight:600;color:var(--ink);margin-top:18px;letter-spacing:-0.374px;}
+  .dropzone .h{font-size:14px;color:var(--ink-48);margin-top:8px;letter-spacing:-0.12px;}
+  .dropzone .actions{margin-top:24px;display:flex;justify-content:center;gap:12px;}
+
+  .uplist{margin-top:24px;display:flex;flex-direction:column;gap:10px;}
+  .uprow{display:grid;grid-template-columns:24px 1fr 100px 130px 80px;gap:16px;align-items:center;padding:14px 18px;background:var(--canvas);border:1px solid var(--hairline);border-radius:8px;font-size:14px;letter-spacing:-0.224px;}
+  .uprow .name{color:var(--ink);font-weight:600;}
+  .uprow .name small{display:block;color:var(--ink-48);font-weight:400;font-size:12px;margin-top:2px;}
+  .uprow .size{color:var(--ink-48);text-align:right;}
+  .uprow .progressbar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;}
+  .uprow .progressbar > i{display:block;height:100%;background:var(--primary);}
+  .uprow .state{text-align:right;color:var(--ink-48);font-size:13px;}
+  .uprow .state.done{color:var(--pass);}
+  .uprow .icon-doc{width:24px;height:24px;border-radius:4px;background:var(--parchment);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-48);font-weight:600;}
+
+  /* metric cards */
+  .mc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .mc{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:8px;}
+  .mc .lab{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:8px;}
+  .mc .num{font-family:var(--font-display);font-size:48px;font-weight:600;line-height:1;letter-spacing:-0.5px;color:var(--ink);margin-top:8px;}
+  .mc .num.mute{color:var(--mute);}
+  .mc .desc{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+
+  /* file ident row */
+  .file-ident{display:grid;grid-template-columns:24px 1fr 140px 90px 1fr;gap:16px;align-items:center;padding:18px 18px;border-bottom:1px solid var(--divider-soft);font-size:14px;letter-spacing:-0.224px;}
+  .file-ident:last-child{border-bottom:none;}
+  .file-ident .name{color:var(--ink);font-weight:600;}
+  .file-ident .desc{color:var(--ink-48);font-size:13px;}
+  .file-ident .pct{font-variant-numeric:tabular-nums;color:var(--ink-48);text-align:right;}
+
+  /* 范围清单 */
+  .scope-group{margin-bottom:32px;}
+  .scope-group h3{font-size:14px;font-weight:600;color:var(--ink-48);text-transform:none;letter-spacing:-0.224px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;}
+  .scope-group h3 .ct{font-weight:400;color:var(--mute);}
+  .scope-row{display:grid;grid-template-columns:24px 1fr 220px;gap:16px;padding:14px 18px;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .scope-row:hover{background:var(--pearl);}
+  .scope-row.recommended{background:rgba(0,102,204,0.03);}
+  .scope-row .cb{width:18px;height:18px;border:1.5px solid var(--hairline);border-radius:4px;background:var(--canvas);display:inline-block;position:relative;}
+  .scope-row.on .cb{background:var(--primary);border-color:var(--primary);}
+  .scope-row.on .cb::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);}
+  .scope-row .lbl{color:var(--ink);}
+  .scope-row .lbl small{display:block;color:var(--ink-48);font-size:12px;font-weight:400;margin-top:2px;letter-spacing:-0.12px;}
+  .scope-row .rule{color:var(--ink-48);font-size:12px;font-family:var(--font-text);text-align:right;letter-spacing:-0.12px;}
+
+  /* 运行预审 subtask 卡 */
+  .runcard{background:var(--canvas);border:1px solid var(--hairline);border-radius:18px;padding:32px 40px;margin-top:32px;}
+  .runcard .total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;}
+  .runcard .total .t{font-size:21px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .runcard .total .pct{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--ink);letter-spacing:-0.5px;line-height:1;}
+  .runcard .bar{height:4px;background:var(--divider-soft);border-radius:9999px;overflow:hidden;margin-bottom:24px;}
+  .runcard .bar > i{display:block;height:100%;background:var(--primary);}
+  .runcard .sub-h{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;margin-bottom:12px;}
+  .runcard .row{display:grid;grid-template-columns:14px 1fr 120px;gap:14px;padding:12px 0;border-bottom:1px solid var(--divider-soft);align-items:center;font-size:14px;letter-spacing:-0.224px;}
+  .runcard .row:last-child{border-bottom:none;}
+  .runcard .row .dot.lg{margin:0;}
+  .runcard .row .n.done{color:var(--ink-48);text-decoration:line-through;text-decoration-color:var(--ink-48);}
+  .runcard .row .n.curr{color:var(--ink);font-weight:600;}
+  .runcard .row .n.mute{color:var(--mute);}
+  .runcard .row .st{text-align:right;font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .runcard .row .st.warn{color:var(--warn);}
+  .spinner{display:inline-block;width:10px;height:10px;border:1.5px solid var(--warn);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:middle;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  /* 阻断/补件卡 */
+  .alert-card{margin-top:32px;padding:24px;border:1px solid var(--hairline);border-radius:18px;background:var(--canvas);}
+  .alert-card .head{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;margin-bottom:14px;}
+  .alert-card ul{list-style:none;padding:0;margin:0;}
+  .alert-card li{padding:10px 0;border-bottom:1px solid var(--divider-soft);font-size:14px;color:var(--ink-80);letter-spacing:-0.224px;}
+  .alert-card li:last-child{border-bottom:none;}
+  .alert-card li b{font-weight:600;color:var(--ink);}
+  .alert-card .act{margin-top:14px;display:flex;justify-content:flex-end;}
+
+  /* 报告页 */
+  .rpt-status{height:80px;background:var(--parchment);display:flex;align-items:center;padding:0 48px;gap:32px;}
+  .rpt-status .h{display:flex;flex-direction:column;gap:2px;min-width:280px;}
+  .rpt-status .h .cap{font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .rpt-status .h .ttl{font-size:17px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .rpt-status .chips{display:flex;gap:8px;flex:1;flex-wrap:wrap;}
+  .rpt-status .conclude{padding:0 14px;height:32px;display:inline-flex;align-items:center;gap:8px;background:var(--canvas);border:1px solid var(--hairline);border-radius:9999px;font-size:13px;color:var(--ink);letter-spacing:-0.224px;font-weight:600;}
+  .rpt-status .actions{display:flex;gap:10px;align-items:center;}
+  .icon-btn{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.04);border:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);font-size:20px;line-height:1;}
+  .icon-btn:active{transform:scale(0.95);}
+
+  /* 主结论卡 · 唯一带 shadow */
+  .hero-card{
+    margin:48px 48px 0;
+    padding:64px 72px;
+    background:var(--canvas);
+    border-radius:18px;
+    box-shadow:rgba(0,0,0,0.22) 3px 5px 30px;
+    position:relative;
+  }
+  .hero-card .tag{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink-48);letter-spacing:-0.224px;}
+  .hero-card h2{font-family:var(--font-display);font-size:48px;font-weight:600;line-height:1.07;letter-spacing:-0.5px;color:var(--ink);margin-top:14px;}
+  .hero-card .lead{font-family:var(--font-display);font-size:24px;font-weight:300;line-height:1.5;color:var(--ink-80);letter-spacing:0;margin-top:18px;max-width:760px;}
+  .hero-card .foot{margin-top:32px;display:flex;gap:24px;align-items:center;font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;}
+  .hero-card .foot span+span::before{content:"·";margin-right:18px;color:var(--mute);}
+
+  .hero-card.mute{background:var(--parchment);box-shadow:none;border:1px dashed var(--hairline);}
+  .hero-card.mute h2{color:var(--mute);}
+  .hero-card.mute .lead{color:var(--ink-48);}
+
+  /* metric strip 紧凑 */
+  .rpt-metrics{padding:32px 48px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .rpt-metric{padding:18px 22px;background:var(--parchment);border-radius:18px;display:flex;flex-direction:column;gap:4px;}
+  .rpt-metric .lab{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;align-items:center;gap:8px;}
+  .rpt-metric .num{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--ink);line-height:1.1;letter-spacing:-0.5px;}
+
+  /* findings · 边到边交替 */
+  .findings-h{padding:64px 48px 0;font-size:14px;font-weight:600;color:var(--ink-48);letter-spacing:-0.224px;text-transform:none;}
+  .findings{margin-top:24px;}
+  .finding{padding:56px 96px;display:grid;grid-template-columns:80px 1fr 140px;gap:32px;align-items:start;}
+  .finding.tile-white{background:var(--canvas);}
+  .finding.tile-parchment{background:var(--parchment);}
+  .finding .num{font-family:var(--font-display);font-size:48px;font-weight:600;color:var(--ink);line-height:1;letter-spacing:-0.5px;}
+  .finding .body{}
+  .finding .row{display:grid;grid-template-columns:90px 1fr;gap:16px;margin-bottom:18px;}
+  .finding .row:last-child{margin-bottom:0;}
+  .finding .row .k{font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;line-height:1.6;padding-top:2px;}
+  .finding .row .v{font-size:16px;color:var(--ink);letter-spacing:-0.374px;line-height:1.6;}
+  .finding .row .v .rule-id{font-weight:600;letter-spacing:-0.374px;}
+  .finding .row .v blockquote{margin:0;padding:8px 14px;background:rgba(0,0,0,0.03);border-left:2px solid var(--hairline);font-size:15px;color:var(--ink-80);}
+  .finding.tile-parchment .row .v blockquote{background:rgba(0,0,0,0.04);}
+  .finding .sev{display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+  .finding .sev .chip-sev{padding:6px 12px;border-radius:9999px;font-size:12px;letter-spacing:-0.12px;display:inline-flex;align-items:center;gap:6px;background:var(--canvas);border:1px solid var(--hairline);font-weight:600;}
+  .finding .sev .evi{font-size:13px;color:var(--primary);letter-spacing:-0.12px;text-decoration:none;}
+
+  /* drawer */
+  .drawer{position:absolute;top:0;right:0;width:440px;height:100%;background:var(--canvas);border-left:1px solid var(--divider-soft);display:flex;flex-direction:column;}
+  .drawer .dhd{padding:24px 28px 0;display:flex;justify-content:space-between;align-items:center;}
+  .drawer .dhd .t{font-size:17px;font-weight:600;color:var(--ink);letter-spacing:-0.374px;}
+  .drawer .dhd .x{background:transparent;border:none;cursor:pointer;font-size:22px;color:var(--ink-48);line-height:1;}
+  .drawer .tabs{display:flex;gap:0;padding:16px 28px 0;border-bottom:1px solid var(--divider-soft);}
+  .drawer .tabs button{background:transparent;border:none;font:inherit;font-family:var(--font-text);padding:10px 14px 14px;font-size:14px;color:var(--ink-48);cursor:pointer;letter-spacing:-0.224px;position:relative;margin-right:4px;}
+  .drawer .tabs button.on{color:var(--ink);font-weight:600;}
+  .drawer .tabs button.on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--ink);}
+  .drawer .tabs button.admin-only{color:var(--primary);}
+  .drawer .timeline{padding:24px 28px;flex:1;overflow:auto;}
+  .drawer .tl-node{display:grid;grid-template-columns:14px 1fr 60px;gap:14px;align-items:flex-start;padding:12px 0;cursor:pointer;}
+  .drawer .tl-node .stem{position:relative;height:100%;}
+  .drawer .tl-node .stem .dot{position:absolute;top:6px;left:4px;}
+  .drawer .tl-node .stem::before{content:"";position:absolute;top:18px;left:7px;bottom:-12px;width:1px;background:var(--divider-soft);}
+  .drawer .tl-node:last-child .stem::before{display:none;}
+  .drawer .tl-node .nm{font-size:14px;color:var(--ink);font-weight:600;letter-spacing:-0.224px;}
+  .drawer .tl-node .nm small{display:block;color:var(--ink-48);font-weight:400;font-size:12px;margin-top:2px;letter-spacing:-0.12px;}
+  .drawer .tl-node .ts{font-size:12px;color:var(--ink-48);text-align:right;letter-spacing:-0.12px;}
+  .drawer .tl-node.curr .nm{color:var(--primary);}
+  .drawer .tl-node:hover{background:var(--pearl);margin:0 -28px;padding-left:28px;padding-right:28px;}
+
+  /* 待重跑 chip */
+  .rerun-chip{background:rgba(255,149,0,0.12);color:#a8560a;font-weight:600;border:1px solid rgba(255,149,0,0.4);}
+  .alert-strip{margin:32px 48px 0;padding:20px 28px;background:rgba(255,149,0,0.08);border:1px solid rgba(255,149,0,0.3);border-radius:18px;display:flex;align-items:center;gap:16px;}
+  .alert-strip .dot{flex:none;}
+  .alert-strip .t{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.224px;}
+  .alert-strip .h{font-size:13px;color:var(--ink-48);margin-top:4px;letter-spacing:-0.12px;}
+  .alert-strip .spacer{flex:1;}
+
+  /* 报告 frame：单 nav 无 wizard 进度 */
+</style></head>
+<body>
+<div class="caption">
+  <div><div class="name">08 · 客户报告页 · 右侧时间线抽屉展开</div><div class="sub">5 个节点 + "已发生 / 进行中 / 未发生"三态 · 管理员多 3 个 admin-only tab</div></div>
+  <div class="meta"><b>tokens</b> drawer / tabs / timeline</div>
+  <div class="meta"><b>尺寸</b> 抽屉 440 · node grid 14/1fr/60</div>
+  <div class="meta"><b>状态</b> 抽屉打开 · 当前 Step 5</div>
+</div><div class="frame no-progress" style="position:relative;"><nav class="gnav">
+    <div class="brand">化工合规预审</div>
+    <div class="crumb">·&nbsp;&nbsp;<b>报告 · CASE-2026-0142</b></div>
+    <div class="spacer"></div>
+    <div class="switch"><button class="on">客户预审视角</button><button>管理端视角</button></div>
+    <div class="me">徐钰</div>
+  </nav><aside class="side">
+    <h6>Case · 6</h6>
+    <div class="case-item active"><div class="title">某丙烯酸酯涂料 · 出口欧盟登记</div><div class="sub"><span class="dot warn"></span>需复核 · 0142</div></div>
+    <div class="case-item"><div class="title">水性环氧地坪 SDS 复核</div><div class="sub"><span class="dot pass"></span>已完成 · 0141</div></div>
+    <div class="case-item"><div class="title">含氟表面活性剂 · 配方合规</div><div class="sub"><span class="dot warn"></span>Step 4 · 0140</div></div>
+    <div class="case-item"><div class="title">某粉末涂料原料替换</div><div class="sub"><span class="dot block"></span>缺件待补 · 0139</div></div>
+    <div class="case-item"><div class="title">车用聚氨酯涂料 · 美国市场</div><div class="sub"><span class="dot pass"></span>已完成 · 0138</div></div>
+    <div class="case-item"><div class="title">2K 木器漆 · 国内备案</div><div class="sub"><span class="dot mute"></span>Step 2 · 0137</div></div>
+  </aside>
+<main class="main" style="position:relative;">
+  
+  <div class="rpt-status">
+    <div class="h">
+      <div class="cap">CASE-2026-0142 · 市场准入审查 · EU</div>
+      <div class="ttl">某丙烯酸酯涂料 · 出口欧盟登记</div>
+    </div>
+    <div class="chips">
+      <span class="chip"><span class="dot pass"></span>已识别 3</span>
+      <span class="chip"><span class="dot mute"></span>需补 0</span>
+      <span class="chip"><span class="dot pass"></span>可查 6</span>
+      <span class="chip"><span class="dot block"></span>阻断 1</span>
+      <span class="conclude"><span class="dot warn"></span>结论 · 需复核</span>
+      
+    </div>
+    <div class="actions">
+      <button class="cta-primary">下载 PDF</button>
+      <button class="icon-btn" title="打开时间线抽屉">⌥</button>
+    </div>
+  </div>
+  <div class="hero-card">
+  <div class="tag"><span class="dot lg warn"></span>审查结论</div>
+  <h2>需复核</h2>
+  <div class="lead">检出 1 项 EU 阻断物（PFOA）与 3 项需复核事项；阻断项必须替换，复核项请审查员逐条人工确认后签发。</div>
+  <div class="foot"><span>审查日期 2026-05-13</span><span>规则库 v2026.05 · EU-REACH-SVHC-247</span><span>主审 AI 复核 + 徐钰</span></div>
+</div>
+  
+<div class="findings-h" style="">不合规事项 · 4 项</div>
+<div class="findings" style="">
+
+  <div class="finding tile-white">
+    <div class="num">01</div>
+    <div class="body">
+      <div class="row"><div class="k">违反规则</div><div class="v">
+        <div class="rule-id">REACH 附录 XVII · 第 68 条</div>
+        <blockquote>"全氟辛酸（PFOA）及其盐类与相关物质，在投放欧盟市场的物品中浓度不应超过 25 ppb（按重量计）。"</blockquote>
+      </div></div>
+      <div class="row"><div class="k">用户原文</div><div class="v">
+        <blockquote>来自 formula-spec-2025Q4.xlsx · 组分 #07：「全氟辛酸 · CAS 335-67-1 · 含量 0.42% 用作流平助剂。」</blockquote>
+      </div></div>
+      <div class="row"><div class="k">改进建议</div><div class="v">
+        将组分 #07 替换为短链含氟流平剂（如全氟丁基磺酸盐，C4 体系）或非氟硅氧烷流平剂；替代后重新提交配方表与 SDS 第 3 节。
+      </div></div>
+    </div>
+    <div class="sev">
+      <span class="chip-sev"><span class="dot block"></span>严重 · 阻断</span>
+      <a class="evi" href="#">查看证据 →</a>
+    </div>
+  </div>
+
+  <div class="finding tile-parchment">
+    <div class="num">02</div>
+    <div class="body">
+      <div class="row"><div class="k">违反规则</div><div class="v">
+        <div class="rule-id">CLP 法规 · 第 17 条</div>
+        <blockquote>"投放欧盟市场的化学品标签，必须使用每个销售成员国的官方语言。"</blockquote>
+      </div></div>
+      <div class="row"><div class="k">用户原文</div><div class="v">
+        <blockquote>来自 acrylic-coating-SDS-v3.pdf · 第 16 节：标签语言仅声明中文 / 英文，未覆盖德语 / 法语 / 意大利语等 EU 主要语种。</blockquote>
+      </div></div>
+      <div class="row"><div class="k">改进建议</div><div class="v">
+        请补充至少德、法、意、西、波 5 种语言版本；若仅在德国销售，至少需含德语版本。SDS 与标签需同步翻译并版本控制。
+      </div></div>
+    </div>
+    <div class="sev">
+      <span class="chip-sev"><span class="dot warn"></span>需复核</span>
+      <a class="evi" href="#">查看证据 →</a>
+    </div>
+  </div>
+
+  <div class="finding tile-white">
+    <div class="num">03</div>
+    <div class="body">
+      <div class="row"><div class="k">违反规则</div><div class="v">
+        <div class="rule-id">GB 18582-2020 · 第 5.2 条</div>
+        <blockquote>"水性建筑涂料中挥发性有机化合物含量（VOC）应 ≤ 80 g/L。"</blockquote>
+      </div></div>
+      <div class="row"><div class="k">用户原文</div><div class="v">
+        <blockquote>来自 formula-spec-2025Q4.xlsx：成膜助剂体系实测 VOC 估算约为 92 g/L（基于丙二醇 + 醇酯-12 占比）。</blockquote>
+      </div></div>
+      <div class="row"><div class="k">改进建议</div><div class="v">
+        将成膜助剂中的醇酯-12 减少约 30%，或替换为更低 VOC 的醚酯类成膜助剂；建议工厂端实测后回传 VOC 实验数据。
+      </div></div>
+    </div>
+    <div class="sev">
+      <span class="chip-sev"><span class="dot warn"></span>需复核</span>
+      <a class="evi" href="#">查看证据 →</a>
+    </div>
+  </div>
+
+  <div class="finding tile-parchment">
+    <div class="num">04</div>
+    <div class="body">
+      <div class="row"><div class="k">违反规则</div><div class="v">
+        <div class="rule-id">REACH 第 31 条 · SDS 完整性</div>
+        <blockquote>"在欧盟市场销售危险物品，须随附符合附录 II 的安全技术说明书，且需在物质数据更新后立即修订。"</blockquote>
+      </div></div>
+      <div class="row"><div class="k">用户原文</div><div class="v">
+        <blockquote>来自 acrylic-coating-SDS-v3.pdf · 第 10 节：稳定性与反应性章节仅记录"避免高温"，未列明不相容物与危险分解产物。</blockquote>
+      </div></div>
+      <div class="row"><div class="k">改进建议</div><div class="v">
+        补充第 10.4-10.6 节：列出已知不相容物（强氧化剂 / 强酸 / 强还原剂）、需要避免的条件（紫外线 / 火源）、危险分解产物（CO / CO₂ / 含氟氢化物）。
+      </div></div>
+    </div>
+    <div class="sev">
+      <span class="chip-sev"><span class="dot warn"></span>需复核</span>
+      <a class="evi" href="#">查看证据 →</a>
+    </div>
+  </div>
+</div>
+  <div style="padding:64px 48px 80px;font-size:12px;color:var(--ink-48);letter-spacing:-0.12px;display:flex;justify-content:space-between;">
+    <span>报告由化工合规预审系统生成 · 仅供内部审查使用</span>
+    <span>CASE-2026-0142 · 2026-05-13</span>
+  </div>
+
+  <div class="drawer">
+    <div class="dhd"><div class="t">审查流程时间线</div><button class="x">✕</button></div>
+    <div class="tabs">
+      <button class="on">时间线</button>
+      <button class="admin-only">RAG 证据</button>
+      <button class="admin-only">Agent 分支</button>
+      <button class="admin-only">规则匹配</button>
+    </div>
+    <div class="timeline">
+      <div class="tl-node"><div class="stem"><span class="dot pass"></span></div><div class="nm">Step 1 · 案件基本信息<small>填写产品标题 / 选择 EU 市场</small></div><div class="ts">05-13 13:48</div></div>
+      <div class="tl-node"><div class="stem"><span class="dot pass"></span></div><div class="nm">Step 2 · 上传资料包<small>3 份文件 · 共 3.5 MB</small></div><div class="ts">05-13 13:51</div></div>
+      <div class="tl-node"><div class="stem"><span class="dot pass"></span></div><div class="nm">Step 3 · 资料预检<small>4 件套：3 / 0 / 6 / 1 · 命中 1 项 EU 阻断</small></div><div class="ts">05-13 13:54</div></div>
+      <div class="tl-node"><div class="stem"><span class="dot pass"></span></div><div class="nm">Step 4 · 审查范围<small>系统推荐 14 项 · 用户保留 14 项</small></div><div class="ts">05-13 13:55</div></div>
+      <div class="tl-node curr"><div class="stem"><span class="dot warn"></span></div><div class="nm">Step 5 · 运行预审<small>当前节点 · 主审已完成 · 待人工签发</small></div><div class="ts">05-13 14:02</div></div>
+      <div class="tl-node"><div class="stem"><span class="dot mute"></span></div><div class="nm">报告签发 / 归档<small>等待审查员盖章</small></div><div class="ts">未发生</div></div>
+    </div>
+    <div style="padding:20px 28px;border-top:1px solid var(--divider-soft);background:var(--pearl);font-size:13px;color:var(--ink-48);letter-spacing:-0.12px;">
+      点击节点可跳回该步骤的只读视图；管理员可切换右侧 tab 查看证据 / Agent / 规则匹配明细。
+    </div>
+  </div>
+</main></div></body></html>

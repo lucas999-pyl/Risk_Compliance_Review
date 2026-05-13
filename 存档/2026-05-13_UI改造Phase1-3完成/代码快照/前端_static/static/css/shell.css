@@ -1,0 +1,229 @@
+/* shell.css — 只放全局壳样式（gnav / pbar / stepbar / side / main + 通用按钮 / chip / dot）
+   page-specific 样式由 Phase 2 各 Agent 在 static/pages/<X>/ 下自管。
+   抽自 docs/UI_v01/_build/core.css，剥离 .caption 段与 wizard/upload/metric/scope/runcard 等 page-specific。 */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--parchment);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* —— 主网格壳：full-bleed，铺满视口 —— */
+.frame {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--canvas);
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 44px 2px 44px 1fr;
+  grid-template-areas:
+    "nav nav"
+    "pbar pbar"
+    "stepbar stepbar"
+    "side main";
+}
+.frame.no-progress {
+  grid-template-rows: 44px 1fr;
+  grid-template-areas:
+    "nav nav"
+    "side main";
+}
+
+/* —— Global nav —— */
+.gnav {
+  grid-area: nav;
+  background: var(--black);
+  color: #fff;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+  font-size: 12px;
+  letter-spacing: -0.12px;
+}
+.gnav .brand { font-weight: 600; letter-spacing: -0.224px; font-size: 13px; }
+.gnav .crumb { color: #cccccc; }
+.gnav .crumb b { color: #fff; font-weight: 400; }
+.gnav .spacer { flex: 1; }
+.gnav .switch {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  padding: 3px;
+  gap: 0;
+}
+.gnav .switch button {
+  background: transparent;
+  color: #cccccc;
+  border: none;
+  font: inherit;
+  font-family: var(--font-text);
+  padding: 5px 14px;
+  border-radius: 9999px;
+  cursor: pointer;
+  letter-spacing: -0.12px;
+}
+.gnav .switch button.on { background: var(--canvas); color: var(--ink); }
+.gnav .me { color: #cccccc; }
+
+/* —— 顶部 2px 进度条 —— */
+.pbar { grid-area: pbar; background: var(--hairline); height: 2px; display: flex; }
+.pbar .seg { flex: 1; background: var(--hairline); }
+.pbar .seg.done { background: var(--primary); }
+.pbar .seg.curr { background: var(--primary); opacity: 0.5; }
+
+/* —— Stepbar（44px） —— */
+.stepbar {
+  grid-area: stepbar;
+  background: var(--parchment);
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  gap: 24px;
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+.stepbar .lead { font-weight: 600; color: var(--ink); }
+.stepbar .tasks { color: var(--mute); display: flex; gap: 14px; }
+.stepbar .tasks span.done { color: var(--ink-48); text-decoration: line-through; text-decoration-color: var(--ink-48); }
+.stepbar .tasks span.curr { color: var(--ink); }
+.stepbar .spacer { flex: 1; }
+.stepbar .right { color: var(--ink-48); }
+
+/* —— Side（240px Case 列表） —— */
+.side {
+  grid-area: side;
+  background: var(--pearl);
+  border-right: 1px solid var(--divider-soft);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+.side h6 {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: -0.12px;
+  color: var(--ink-48);
+  text-transform: uppercase;
+  padding: 0 12px 8px;
+}
+.case-item {
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.case-item.active { background: var(--canvas); }
+.case-item .title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.224px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.case-item .sub {
+  font-size: 12px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* —— Main 路由 outlet —— */
+.main { grid-area: main; background: var(--canvas); overflow-y: auto; }
+
+/* —— 通用 dot —— */
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.lg { width: 10px; height: 10px; }
+.dot.pass { background: var(--pass); }
+.dot.warn { background: var(--warn); }
+.dot.block { background: var(--block); }
+.dot.mute { background: var(--mute); }
+
+/* —— 通用按钮 —— */
+.cta-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  font-family: var(--font-text);
+  font-size: 16px;
+  letter-spacing: -0.374px;
+  padding: 11px 22px;
+  border-radius: 9999px;
+  cursor: pointer;
+  line-height: 1.24;
+  white-space: nowrap;
+}
+.cta-primary:active { transform: scale(0.97); }
+.cta-primary.lg { font-size: 18px; font-weight: 300; padding: 14px 32px; }
+.cta-primary[disabled], .cta-primary.disabled { background: #cfd0d3; color: #fff; cursor: not-allowed; }
+.cta-ghost {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  font-family: var(--font-text);
+  font-size: 16px;
+  letter-spacing: -0.374px;
+  padding: 10px 22px;
+  border-radius: 9999px;
+  cursor: pointer;
+  line-height: 1.24;
+}
+.cta-dark {
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  font-family: var(--font-text);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+  padding: 8px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cta-pearl {
+  background: var(--pearl);
+  color: var(--ink-80);
+  border: 1px solid var(--divider-soft);
+  font-family: var(--font-text);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+
+/* —— 通用 chip —— */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  background: var(--parchment);
+  border-radius: 9999px;
+  font-size: 12px;
+  color: var(--ink-80);
+  letter-spacing: -0.12px;
+  line-height: 1;
+}
+.chip.strong { background: var(--canvas); border: 1px solid var(--hairline); }
+.chip.bare { background: transparent; padding: 0; }

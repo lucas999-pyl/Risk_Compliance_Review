@@ -8,7 +8,16 @@ from typing import Literal
 
 ParseStatus = Literal["parsed", "needs_manual_review", "parse_failed"]
 
-SECTION_PATTERN = re.compile(r"(?m)^\s*(?P<number>1[0-6]|[1-9])[\.\)]\s*(?P<title>[^\n\r]+?)\s*$")
+SECTION_PATTERN = re.compile(
+    r"(?m)^\s*(?:#+\s*)?"
+    r"(?:第\s*)?"
+    r"(?P<number>1[0-6]|[1-9])"
+    r"(?:\s*章)?"
+    r"[\.\)：:]?\s+"
+    r"(?P<title>\S[^\n\r]*?)\s*$"
+)
+MD_TABLE_LINE = re.compile(r"^\s*\|.+\|\s*$")
+MD_TABLE_SEPARATOR = re.compile(r"^\s*-+\s*$|^\s*:?-+:?\s*$")
 CAS_PATTERN = re.compile(r"\b(?P<cas>\d{2,7}-\d{2}-\d)\b")
 COMPONENT_PATTERN = re.compile(
     r"(?m)^\s*(?P<name>.+?)\s+CAS\s+"
@@ -174,7 +183,72 @@ def extract_components(text: str) -> list[ExtractedComponent]:
                 concentration_max=concentration,
             )
         )
+    if not components:
+        components = list(extract_components_from_markdown_table(text))
     return components
+
+
+def extract_components_from_markdown_table(text: str) -> list[ExtractedComponent]:
+    results: list[ExtractedComponent] = []
+    headers: list[str] = []
+    col: dict[str, int] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not MD_TABLE_LINE.match(line):
+            headers = []
+            col = {}
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if cells and all((not c) or MD_TABLE_SEPARATOR.match(c) for c in cells):
+            continue
+        if not headers:
+            headers = cells
+            for i, h in enumerate(cells):
+                hl = h.lower().replace(" ", "")
+                if "cas" in hl and "cas" not in col:
+                    col["cas"] = i
+                elif (hl == "ec" or "ec号" in hl or "ec编号" in hl) and "ec" not in col:
+                    col["ec"] = i
+                elif ("含量" in h or "浓度" in h or "%" in h or "比例" in h or "wt" in hl) and "conc" not in col:
+                    col["conc"] = i
+                elif ("中文名" in h or "组分" in h or "名称" in h) and "name" not in col:
+                    col["name"] = i
+            continue
+        if "cas" not in col or len(cells) <= col["cas"]:
+            continue
+        cas_m = re.search(r"\b(\d{2,7}-\d{2}-\d)\b", cells[col["cas"]])
+        if not cas_m:
+            continue
+        cas = cas_m.group(1)
+        name = cells[col["name"]].strip(" :-") if "name" in col and len(cells) > col["name"] else cas
+        if not name or "合计" in name or "总计" in name:
+            continue
+        conc_min = 0.0
+        conc_max = 0.0
+        conc_text = ""
+        if "conc" in col and len(cells) > col["conc"]:
+            cell = cells[col["conc"]]
+            cm = re.search(r"(\d+(?:\.\d+)?)(?:\s*[-~–]\s*(\d+(?:\.\d+)?))?", cell)
+            if cm:
+                conc_min = float(cm.group(1))
+                conc_max = float(cm.group(2)) if cm.group(2) else conc_min
+                conc_text = f"{cell}%" if "%" not in cell else cell
+        ec = None
+        if "ec" in col and len(cells) > col["ec"]:
+            ev = cells[col["ec"]]
+            if re.fullmatch(r"[0-9-]+", ev):
+                ec = ev
+        results.append(
+            ExtractedComponent(
+                name=name,
+                cas=cas,
+                ec=ec,
+                concentration_text=conc_text,
+                concentration_min=conc_min,
+                concentration_max=conc_max,
+            )
+        )
+    return results
 
 
 def _extract_pdf_text(raw: bytes) -> str:
