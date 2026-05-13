@@ -144,6 +144,38 @@ def test_customer_report_exposes_industrial_structured_contract(tmp_path: Path) 
     assert "chunks" not in report
 
 
+def test_customer_report_quotes_uploaded_source_text_for_rule_hits(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+    client.post("/chemical/knowledge/import-demo-pack")
+
+    payload = _upload_package(
+        client,
+        "incompatible_oxidizer_flammable",
+        data={
+            "review_scenario": "market_access",
+            "check_types": "intake_readiness,ingredient_identity,restricted_substance,compatibility_risk,storage_transport,regulatory_screening",
+            "target_markets": "CN,EU",
+        },
+    )
+
+    issues = [
+        item
+        for group in payload["customer_report"]["issue_groups"]
+        for item in group["items"]
+        if item["rule_id"] == "incompatibility_oxidizer_flammable"
+    ]
+
+    assert len(issues) == 1
+    issue = issues[0]
+    assert "SDS 章节数 16" not in issue["user_text"]
+    assert "缺失字段 ['无']" not in issue["user_text"]
+    assert "用户资料未提供可直接引用的原文" not in issue["user_text"]
+    assert "乙醇 CAS 64-17-5 45%" in issue["user_text"]
+    assert "过氧化氢 CAS 7722-84-1 12%" in issue["user_text"]
+    assert "同一反应釜" in issue["user_text"] or "同釜混配" in issue["user_text"]
+    assert issue["source"]["evidence_refs"] == ["formula_document", "process_document"]
+
+
 def test_chemical_case_draft_upload_and_run_review_are_persisted(tmp_path: Path) -> None:
     client = _make_client(tmp_path)
     client.post("/chemical/knowledge/import-demo-pack")

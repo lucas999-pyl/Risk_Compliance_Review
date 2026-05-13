@@ -2329,6 +2329,7 @@ class ChemicalRagRunner:
             supplement_actions=supplement_actions,
             risk_items=risk_items,
             evidence_chain=evidence_chain,
+            source_documents=source_documents,
             package_precheck=package_precheck,
             run_id=run_id,
             generated_at=generated_at,
@@ -2446,6 +2447,7 @@ class ChemicalRagRunner:
         supplement_actions: list[dict[str, Any]],
         risk_items: list[dict[str, Any]],
         evidence_chain: list[dict[str, Any]],
+        source_documents: list[dict[str, Any]] | None = None,
         package_precheck: dict[str, Any] | None = None,
         run_id: str | None = None,
         generated_at: str | None = None,
@@ -2537,15 +2539,15 @@ class ChemicalRagRunner:
             rule_id = item["rule_refs"][0] if item.get("rule_refs") else "manual_review"
             if self._is_positive_rule(rule_id):
                 continue
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
-            key = (check_type, rule_id, user_text)
+            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain, source_documents, rule_id)
+            key = (check_type, rule_id)
             if key in seen:
                 continue
             seen.add(key)
             issue_id = f"I-{counter:03d}"
             status = self._customer_issue_status(item["verdict"])
             rule_text = self._customer_rule_text(rule_id)
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain)
+            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain, source_documents, rule_id)
             check_label = CHECK_TYPE_LABELS[check_type]
             grouped[check_type].append(
                 {
@@ -2823,15 +2825,78 @@ class ChemicalRagRunner:
         }
         return reasons.get(rule_id, fallback.removeprefix(f"命中规则 {rule_id}："))
 
-    def _customer_user_text(self, evidence_refs: list[str], evidence_chain: list[dict[str, Any]]) -> str:
+    def _customer_user_text(
+        self,
+        evidence_refs: list[str],
+        evidence_chain: list[dict[str, Any]],
+        source_documents: list[dict[str, Any]] | None = None,
+        rule_id: str | None = None,
+    ) -> str:
         refs = set(evidence_refs)
+        source_quote = self._customer_source_quote(refs, source_documents or [], rule_id)
+        if source_quote:
+            return source_quote
         for evidence in evidence_chain:
             if evidence["ref"] in refs and evidence["type"] == "资料":
                 return evidence["snippet"]
         for evidence in evidence_chain:
             if evidence["ref"] in refs:
                 return evidence["snippet"]
-        return evidence_chain[0]["snippet"] if evidence_chain else "用户资料未提供可直接引用的原文。"
+        return "用户资料未提供可直接引用的原文。"
+
+    def _customer_source_quote(
+        self,
+        evidence_refs: set[str],
+        source_documents: list[dict[str, Any]],
+        rule_id: str | None,
+    ) -> str:
+        if not source_documents:
+            return ""
+        ref_to_type = {
+            "sds_document": "SDS",
+            "formula_document": "配方表",
+            "process_document": "工艺资料",
+        }
+        requested_types = {ref_to_type[ref] for ref in evidence_refs if ref in ref_to_type}
+        if not requested_types:
+            return ""
+        quote_parts = []
+        for document in source_documents:
+            if document.get("type") not in requested_types:
+                continue
+            lines = self._customer_relevant_source_lines(str(document.get("content", "")), rule_id)
+            if lines:
+                quote_parts.append(f"{document.get('type')}：{'；'.join(lines)}")
+        return " | ".join(quote_parts)
+
+    def _customer_relevant_source_lines(self, text: str, rule_id: str | None) -> list[str]:
+        lines = [line.strip(" -\t") for line in text.splitlines() if line.strip()]
+        if not lines:
+            return []
+        keyword_groups = {
+            "incompatibility_oxidizer_flammable": [
+                "乙醇",
+                "过氧化氢",
+                "可燃",
+                "氧化",
+                "同釜",
+                "同一反应釜",
+                "同一混配单元",
+                "同储",
+            ],
+            "incompatibility_hypochlorite_acid": ["次氯酸钠", "盐酸", "酸", "氯气", "同釜", "同槽", "同储"],
+            "enterprise_redline_benzene": ["苯", "企业红线", "红线"],
+            "flammable_storage_missing": ["储存", "防火", "通风", "防爆", "可燃"],
+            "transport_un_mismatch": ["运输", "UN", "易燃液体"],
+            "oxidizer_high_temperature_process": ["温度", "高温", "过氧化氢", "氧化", "加热"],
+            "supplier_evidence_conflict": ["供应商声明", "检测报告", "符合性声明", "不一致"],
+            "cross_file_identity_conflict": ["CAS", "浓度", "成分", "配方"],
+            "hazardous_catalog_match": ["危化", "危险化学品", "法规"],
+            "svhc_threshold_match": ["SVHC", "REACH", "双酚", "0.1"],
+        }
+        keywords = keyword_groups.get(rule_id or "", ["CAS", "浓度", "储存", "运输", "工艺", "关键步骤"])
+        matched = [line for line in lines if any(keyword in line for keyword in keywords)]
+        return matched[:4] or lines[:2]
 
     def _customer_issue_impact(self, verdict: str, rule_id: str) -> str:
         if verdict == "不合规":
