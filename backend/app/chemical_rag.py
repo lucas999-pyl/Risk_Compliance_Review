@@ -104,6 +104,8 @@ REVIEW_RULES = {
     "oxidizer_high_temperature_process",
     "sds_revision_outdated",
     "transport_un_mismatch",
+    "supplier_evidence_conflict",
+    "cross_file_identity_conflict",
 }
 CHECK_TYPE_LABELS = {
     "intake_readiness": "资料完整性与可审性",
@@ -133,7 +135,7 @@ CHECK_TYPE_AGENTS = {
     "process_fit": "工艺",
     "storage_transport": "储运",
     "regulatory_screening": "法规",
-    "supplier_evidence_consistency": "资料完整性",
+    "supplier_evidence_consistency": "供应商证据",
     "manual_review": "资料完整性",
 }
 AGENT_CHECK_TYPES = {agent: check_type for check_type, agent in CHECK_TYPE_AGENTS.items()}
@@ -490,6 +492,8 @@ class ChemicalRagRunner:
             "储运": self._storage_agent(components, formula, parsed_sds, process),
             "法规": self._regulatory_agent(case, components, retrieval_by_agent.get("法规", retrieved), parsed_sds),
         }
+        if "供应商证据" in {CHECK_TYPE_AGENTS[item] for item in case["check_types"] if item in CHECK_TYPE_AGENTS}:
+            base_agent_results["供应商证据"] = self._supplier_evidence_agent(case, parsed_sds, formula, process)
         sub_agent_results = self._with_llm_concurrently(
             base_agent_results,
             retrieved,
@@ -1517,6 +1521,7 @@ class ChemicalRagRunner:
             "工艺": "process temperature pressure mixing cleaning electronics oxidizer high temperature incompatible operation",
             "储运": "storage transport UN number compatibility oxidizer flammable acid hypochlorite segregation",
             "法规": "CN EU US REACH SVHC TSCA OSHA HCS hazardous chemicals catalog market access",
+            "供应商证据": "supplier declaration test report certificate evidence consistency CAS concentration conflict contradiction",
         }
         queries = {}
         for task in task_decomposition:
@@ -1727,6 +1732,10 @@ class ChemicalRagRunner:
             hits.append(self._rule_hit("sds_revision_outdated", "GLOBAL", ["sds_document"], 0.82))
         if self._has_transport_un_mismatch(parsed_sds, components, process):
             hits.append(self._rule_hit("transport_un_mismatch", "GLOBAL", ["sds_document", "process_document"], 0.78))
+        if self._has_supplier_evidence_conflict(case, parsed_sds, formula, process):
+            hits.append(self._rule_hit("supplier_evidence_conflict", "GLOBAL", ["sds_document", "formula_document"], 0.8))
+        if self._has_cross_file_identity_conflict(parsed_sds, formula, process):
+            hits.append(self._rule_hit("cross_file_identity_conflict", "GLOBAL", ["sds_document", "formula_document"], 0.82))
         if not retrieved:
             hits.append(self._rule_hit("knowledge_no_match_review", "GLOBAL", ["knowledge_base"], 0.0))
         return hits
@@ -1813,6 +1822,25 @@ class ChemicalRagRunner:
                 0.78,
             )
         return self._agent_result("合规", ["storage_compatible"], ["未发现配方成分之间的演示禁忌储存组合。"], 0.9)
+
+    def _supplier_evidence_agent(
+        self,
+        case: dict[str, Any],
+        parsed_sds: Any,
+        formula: dict[str, Any],
+        process: dict[str, Any],
+    ) -> dict[str, Any]:
+        hit_rules = []
+        reasons = []
+        if self._has_supplier_evidence_conflict(case, parsed_sds, formula, process):
+            hit_rules.append("supplier_evidence_conflict")
+            reasons.append("供应商声明、检测报告或核心资料之间存在不一致，需要供应商澄清。")
+        if self._has_cross_file_identity_conflict(parsed_sds, formula, process):
+            hit_rules.append("cross_file_identity_conflict")
+            reasons.append("SDS 与配方表中的 CAS 或浓度信息存在冲突，需要重新确认物质身份。")
+        if hit_rules:
+            return self._agent_result("复核", hit_rules, reasons, 0.8)
+        return self._agent_result("合规", ["supplier_evidence_consistent"], ["供应商声明、检测报告与核心资料未发现明显冲突。"], 0.78)
 
     def _regulatory_agent(
         self,
@@ -1933,6 +1961,7 @@ class ChemicalRagRunner:
             "工艺": self._process_summary(process),
             "储运": f"储存条件：{self._storage_value(process, formula)}；UN 编号：{'、'.join(parsed_sds.metadata.get('un_numbers', [])) or '未提供/不适用'}。",
             "法规": f"目标市场法规初筛；CAS：{', '.join(component['cas'] for component in components) or '未抽取'}。",
+            "供应商证据": "供应商声明、检测报告、SDS 与配方表的一致性核对。",
         }
         branches = {}
         for agent_name, task in task_by_agent.items():
@@ -2177,6 +2206,8 @@ class ChemicalRagRunner:
             "enterprise_redline_benzene": "企业内部化工准入红线演示规则",
             "flammable_storage_missing": "企业储运兼容性演示规则",
             "transport_un_mismatch": "企业储运兼容性演示规则",
+            "supplier_evidence_conflict": "企业供应商证据一致性演示规则",
+            "cross_file_identity_conflict": "企业供应商证据一致性演示规则",
             "oxidizer_high_temperature_process": "企业氧化剂工艺安全演示规则",
             "hazardous_catalog_match": "中国危险化学品目录演示摘录",
             "svhc_threshold_match": "ECHA REACH/SVHC 演示摘录",
@@ -2622,13 +2653,13 @@ class ChemicalRagRunner:
             "next_actions": self._customer_next_actions(customer_verdict, combined_supplement_actions),
             "evidence_policy": {
                 "customer_report_includes": ["规则编号", "规则原文", "用户资料原文/识别结果", "影响说明", "整改或补件建议"],
-                "customer_report_excludes": ["RAG chunks", "rerank 分数", "agent 分支原始输出", "trace 节点 JSON"],
-                "admin_evidence_location": "technical_trace / retrieval / agent_branches",
+                "customer_report_excludes": ["检索切片明细", "内部排序分数", "智能体分支原始输出", "执行链路调试 JSON"],
+                "admin_evidence_location": "管理端技术证据区",
             },
             "limitations": self._customer_limitations(package_precheck, customer_verdict),
             "technical_reference": {
-                "admin_trace_available": True,
-                "trace_fields": ["technical_trace", "retrieval", "agent_branches", "trace"],
+                "admin_evidence_available": True,
+                "admin_evidence_sections": ["管理端技术证据", "检索证据", "智能体分支", "执行链路"],
                 "run_id": run_id,
             },
             "disclaimer": "本结果为 AI 辅助合规预审，不替代最终法规、法律或 EHS 审批意见。",
@@ -2757,6 +2788,8 @@ class ChemicalRagRunner:
             return "process_fit"
         if rule_id in {"hazardous_catalog_match", "svhc_threshold_match", "tsca_inventory_match", "knowledge_no_match_review"}:
             return "regulatory_screening"
+        if rule_id in {"supplier_evidence_conflict", "cross_file_identity_conflict"}:
+            return "supplier_evidence_consistency"
         if rule_id in {"unknown_substance_review", "enterprise_redline_benzene"}:
             return "restricted_substance"
         return "ingredient_identity"
@@ -2782,6 +2815,8 @@ class ChemicalRagRunner:
             "flammable_storage_missing": "含可燃组分但储存隔离、防火或通风条件不足。",
             "oxidizer_high_temperature_process": "氧化剂涉及高温或不明确工艺条件，需要工艺安全复核。",
             "transport_un_mismatch": "运输信息与物质风险不一致或不足。",
+            "supplier_evidence_conflict": "供应商声明、检测报告或配方资料存在不一致。",
+            "cross_file_identity_conflict": "SDS 与配方表中的 CAS 或浓度信息不一致。",
             "hazardous_catalog_match": "物质存在危化品目录命中信号，需要结合法规和用途复核。",
             "svhc_threshold_match": "物质存在 SVHC 阈值相关风险，需要补充 REACH/SVHC 证明。",
             "tsca_inventory_match": "物质涉及 TSCA 清单核验，需要确认美国市场状态。",
@@ -2803,6 +2838,8 @@ class ChemicalRagRunner:
             return "该事项触发硬性拦截或企业红线，当前资料不支持直接准入。"
         if rule_id in {"sds_missing_sections", "formula_components_missing", "process_parameters_missing", "knowledge_pack_missing_review"}:
             return "资料基础不足，系统不能形成证据充分的自动放行意见。"
+        if rule_id in {"supplier_evidence_conflict", "cross_file_identity_conflict"}:
+            return "客户资料之间存在冲突，必须由供应商澄清后才能进入正式准入判断。"
         return "该事项存在不确定性，需要 EHS/法规人员结合业务场景确认。"
 
     def _review_checklist(
@@ -3199,6 +3236,25 @@ class ChemicalRagRunner:
         has_flammable = any("flammable_demo" in component.get("tags", []) for component in components)
         has_ethanol_or_acetone = any(component["cas"] in {"64-17-5", "67-64-1"} for component in components)
         return has_flammable and has_ethanol_or_acetone
+
+    def _has_supplier_evidence_conflict(
+        self,
+        case: dict[str, Any],
+        parsed_sds: Any,
+        formula: dict[str, Any],
+        process: dict[str, Any],
+    ) -> bool:
+        text = " ".join([case.get("review_task", ""), process.get("text", ""), formula.get("text", "")]).lower()
+        cn_text = " ".join([case.get("review_task", ""), process.get("text", ""), formula.get("text", "")])
+        return any(keyword in text for keyword in ["conflict", "contradiction", "detected bpa"]) or any(keyword in cn_text for keyword in ["声明不含", "检测报告检出", "不一致", "冲突"])
+
+    def _has_cross_file_identity_conflict(self, parsed_sds: Any, formula: dict[str, Any], process: dict[str, Any]) -> bool:
+        text = " ".join([process.get("text", ""), formula.get("text", "")])
+        if any(keyword in text for keyword in ["跨文件冲突", "CAS/浓度冲突", "SDS 与配方表不一致", "浓度不一致"]):
+            return True
+        sds_cas = set(parsed_sds.metadata.get("cas_numbers", []))
+        formula_cas = {component["cas"] for component in formula.get("components", [])}
+        return bool(sds_cas and formula_cas and sds_cas.isdisjoint(formula_cas))
 
     def _is_sds_revision_outdated(self, parsed_sds: Any) -> bool:
         revision = parsed_sds.extracted_fields.get("revision_date")

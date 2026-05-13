@@ -9,6 +9,7 @@ data/
 .env.*
 !.env.example
 .vscode/
+.superpowers/
 node_modules/
 dist/
 build/

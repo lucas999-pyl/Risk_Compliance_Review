@@ -11,7 +11,8 @@
 - 业务检查项：支持供应商准入、替代物料、目标市场筛查、工艺导入、储运安全等场景和固定检查项。
 - RAG 与规则：支持 keyword/CAS exact match、向量召回、规则 rerank、证据链和知识库版本信息。
 - 多 Agent 审查：按资料完整性、物料、工艺、储运、法规分支分析，并由主审汇总最终预审结论。
-- 客户报告：输出 `pass | needs_review | not_approved | needs_supplement`，只展示不合格、复核和补件事项。
+- 演示 Case 模板：工作台内置 18 个可一键载入的演示资料包，覆盖合规、补件、复核和不建议准入场景。
+- 客户报告：输出 `pass | needs_review | not_approved | needs_supplement`，只展示不合格、复核和补件事项，并支持 HTML、PDF、JSON 下载。
 - 管理端证据：保留 review_task、TopK、RAG chunks、rerank、Agent 分支和 trace，供内部排错和审计。
 
 ## 技术栈
@@ -31,6 +32,15 @@
 ```powershell
 python -m pip install -e ".[dev]"
 ```
+
+如果需要下载正式 PDF 报告，安装报告可选依赖和浏览器运行时：
+
+```powershell
+python -m pip install -e ".[dev,reports]"
+python -m playwright install chromium
+```
+
+未安装 Playwright 或 Chromium 时，HTML/JSON 报告仍可使用，PDF 接口会返回明确的 503 降级提示。
 
 启动服务：
 
@@ -102,14 +112,20 @@ python -m compileall backend/app
 
 每条问题包含编号、状态、严重度、分类、原因、规则编号、规则原文、用户资料原文/识别结果、影响说明、整改或补件建议。
 
+客户报告下载接口复用同一份 `customer_report.v1`：HTML 是在线预览和 PDF 输入模板，PDF 由 Playwright 服务端渲染生成，JSON 用于系统集成。报告正文不包含 `agent_branches`、`retrieval`、`trace`、RAG chunks 或 rerank 分数；这些内部证据仍保留在管理端。
+
 ## 关键 API
 
+- `GET /chemical/demo-cases`
 - `GET /chemical/cases`
 - `POST /chemical/cases`
 - `DELETE /chemical/cases`
 - `GET /chemical/cases/{case_id}`
 - `POST /chemical/cases/{case_id}/documents`
 - `POST /chemical/cases/{case_id}/run-review`
+- `GET /chemical/cases/{case_id}/report.json`
+- `GET /chemical/cases/{case_id}/report.html`
+- `GET /chemical/cases/{case_id}/report.pdf`
 - `POST /chemical/upload-review`
 - `POST /chemical/knowledge/upload-pack`
 - `GET /chemical/knowledge/status`

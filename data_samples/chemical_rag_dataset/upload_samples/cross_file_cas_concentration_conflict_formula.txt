@@ -1,0 +1,4 @@
+配方名称：Cross File Cleaner
+- Acetone CAS 67-64-1 30%
+- Water CAS 7732-18-5 70%
+备注：SDS 与配方表不一致，存在 CAS/浓度冲突。

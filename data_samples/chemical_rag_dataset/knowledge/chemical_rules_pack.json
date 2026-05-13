@@ -44,6 +44,16 @@
       "content": "规则 oxidizer_high_temperature_process：过氧化氢 CAS 7722-84-1 等氧化剂若工艺温度达到或超过 60 C，或资料显示加热、热源、夹套升温、循环喷淋等高温操作，应输出复核，并要求 EHS 或工艺安全人员确认稳定性、分解风险和防护措施。"
     },
     {
+      "title": "企业供应商证据一致性演示规则",
+      "jurisdiction": "GLOBAL",
+      "source_type": "internal_rule",
+      "source_url": "internal://chemical-rag/rules/supplier-evidence-consistency",
+      "version": "supplier-evidence-demo-2026-05",
+      "effective_date": "2026-05-01",
+      "license_note": "合成演示规则，生产环境应结合供应商质量协议、检测报告原件和企业法规复核流程确认。",
+      "content": "规则 supplier_evidence_conflict：供应商声明、检测报告、SDS 或配方资料之间若出现不含声明与检出结果冲突、适用市场声明与成分证据不一致、或证明文件无法支撑所选检查项，应输出复核并要求供应商澄清。规则 cross_file_identity_conflict：SDS 与配方表中的 CAS、物质名称或浓度区间存在明显不一致时，应输出复核，不能自动放行。规则 supplier_evidence_consistent：供应商声明、检测报告和核心资料一致时，可作为资料一致性正向证据，但仍不替代最终 EHS/法规审批。"
+    },
+    {
       "title": "中国危险化学品目录演示摘录",
       "jurisdiction": "CN",
       "source_type": "official_law_demo",

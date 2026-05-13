@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -102,8 +104,8 @@ def test_customer_report_exposes_industrial_structured_contract(tmp_path: Path) 
         len(group["items"]) for group in report["issue_groups"]
     )
     assert {"completed_checks", "limited_checks", "blocked_checks"} <= set(report["review_scope"])
-    assert "RAG chunks" in report["evidence_policy"]["customer_report_excludes"]
-    assert report["technical_reference"]["admin_trace_available"] is True
+    assert "检索切片明细" in report["evidence_policy"]["customer_report_excludes"]
+    assert report["technical_reference"]["admin_evidence_available"] is True
 
     group = next(group for group in report["issue_groups"] if group["items"])
     assert {"id", "label", "issue_count", "status_counts", "items"} <= set(group)
@@ -381,6 +383,116 @@ def test_review_scenarios_recommend_business_check_types_and_keep_legacy_compati
     ]
 
 
+def test_demo_case_catalog_exposes_12_manifest_cases_and_6_new_upload_templates(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+
+    response = client.get("/chemical/demo-cases")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["template_count"] == 18
+    assert {group["id"] for group in payload["groups"]} >= {"pass", "needs_supplement", "needs_review", "not_approved"}
+    assert len([item for item in payload["templates"] if item["source"] == "manifest"]) == 12
+    upload_templates = [item for item in payload["templates"] if item["source"] == "upload_sample"]
+    assert len(upload_templates) == 6
+    assert {
+        "supplier_statement_test_conflict",
+        "eu_svhc_single_market",
+        "cn_hazardous_review",
+        "scanned_unreadable_package",
+        "storage_transport_supplement",
+        "cross_file_cas_concentration_conflict",
+    } <= {item["id"] for item in upload_templates}
+    for item in payload["templates"]:
+        assert {"id", "title", "group", "source", "expected_customer_verdict", "review_task", "target_markets", "check_types", "files"} <= set(item)
+        assert item["files"]
+        assert all(Path(file["path"]).exists() for file in item["files"])
+
+
+def test_customer_report_downloads_json_html_and_pdf_from_latest_report(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+    client.post("/chemical/knowledge/import-demo-pack")
+    payload = _upload_package(
+        client,
+        "incompatible_oxidizer_flammable",
+        data={
+            "review_scenario": "market_access",
+            "check_types": "intake_readiness,ingredient_identity,restricted_substance,compatibility_risk,storage_transport,regulatory_screening",
+            "target_markets": "CN,EU",
+        },
+    )
+    case_id = payload["case_id"]
+
+    report_json = client.get(f"/chemical/cases/{case_id}/report.json")
+    assert report_json.status_code == 200, report_json.text
+    customer_report = report_json.json()
+    assert customer_report["schema_version"] == "customer_report.v1"
+    assert customer_report["report_metadata"]["case_id"] == case_id
+    assert "agent_branches" not in customer_report
+    assert "retrieval" not in customer_report
+    assert "trace" not in customer_report
+
+    report_html = client.get(f"/chemical/cases/{case_id}/report.html")
+    assert report_html.status_code == 200, report_html.text
+    assert "text/html" in report_html.headers["content-type"]
+    assert "客户合规预审报告" in report_html.text
+    assert payload["customer_report"]["verdict_label"] in report_html.text
+    assert "问题分组" in report_html.text
+    assert "技术边界" in report_html.text
+    assert "本结果为 AI 辅助合规预审" in report_html.text
+    assert "agent_branches" not in report_html.text
+    assert "retrieval" not in report_html.text
+
+    with patch("app.reporting.render_customer_report_pdf", return_value=b"%PDF-1.4\n% test\n%%EOF"):
+        report_pdf = client.get(f"/chemical/cases/{case_id}/report.pdf")
+    assert report_pdf.status_code == 200, report_pdf.text
+    assert report_pdf.headers["content-type"] == "application/pdf"
+    assert report_pdf.content.startswith(b"%PDF-")
+
+
+def test_customer_report_pdf_returns_clear_error_when_renderer_unavailable(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+    client.post("/chemical/knowledge/import-demo-pack")
+    payload = _upload_package(
+        client,
+        "unknown_missing_process",
+        data={
+            "review_scenario": "supplier_intake",
+            "check_types": "intake_readiness,ingredient_identity,manual_review",
+            "target_markets": "CN,EU",
+        },
+    )
+
+    with patch("app.reporting.render_customer_report_pdf", side_effect=RuntimeError("Playwright browser runtime is not installed")):
+        response = client.get(f"/chemical/cases/{payload['case_id']}/report.pdf")
+
+    assert response.status_code == 503
+    assert "Playwright" in response.json()["detail"]
+
+
+def test_customer_report_pdf_uses_system_chrome_fallback_when_playwright_is_missing() -> None:
+    from app import reporting
+
+    report = {
+        "schema_version": "customer_report.v1",
+        "report_metadata": {"case_id": "case_pdf_fallback", "run_id": "run_pdf_fallback", "generated_at": "2026-05-13T00:00:00+00:00"},
+        "case_profile": {"title": "PDF fallback case", "target_markets": ["CN"]},
+        "verdict": "needs_review",
+        "verdict_label": "需人工复核",
+        "executive_summary": {"issue_count": 0, "supplement_count": 0, "needs_review_count": 0, "not_approved_count": 0},
+        "summary": "用于验证系统 Chrome 兜底生成 PDF。",
+        "selected_checks": [],
+        "issue_groups": [],
+    }
+
+    with patch.dict(sys.modules, {"playwright": None, "playwright.sync_api": None}):
+        with patch("app.reporting._render_customer_report_pdf_with_chrome", return_value=b"%PDF-1.4\n% fallback\n%%EOF", create=True) as chrome_pdf:
+            pdf = reporting.render_customer_report_pdf(report)
+
+    assert pdf.startswith(b"%PDF-")
+    chrome_pdf.assert_called_once()
+
+
 def test_static_workbench_exposes_customer_flow_and_keeps_admin_advanced_task() -> None:
     html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
 
@@ -413,6 +525,97 @@ def test_static_workbench_exposes_customer_flow_and_keeps_admin_advanced_task() 
     assert "普通用户端不需要填写" in html
     assert "clearDemoPackageSelection" in html
     assert "clearCustomerPackageSelection" in html
+
+
+def test_static_workbench_exposes_expanded_demo_case_templates_and_report_downloads() -> None:
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert "/chemical/demo-cases" in html
+    assert "demoCaseTemplates" in html
+    assert "renderDemoCaseTemplates" in html
+    assert "supplier_statement_test_conflict" in html
+    assert "cross_file_cas_concentration_conflict" in html
+    assert "报告下载" in html
+    assert "downloadReportJson" in html
+    assert "downloadReportHtml" in html
+    assert "downloadReportPdf" in html
+    assert "downloadCaseReportFile" in html
+    assert "URL.createObjectURL" in html
+    assert "link.download = filename" in html
+    assert "window.open(`/chemical/cases/${state.selectedCaseId}/report.${format}`" not in html
+    assert "/report.json" in html
+    assert "/report.html" in html
+    assert "/report.pdf" in html
+
+
+def test_static_workbench_refines_demo_templates_reset_and_report_copy() -> None:
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert "demo-template-toolbar" in html
+    assert "demo-template-counts" in html
+    assert "activeGroupCount" in html
+    assert "覆盖 ${activeGroupCount} 类场景" in html
+    assert "orderedTemplates" in html
+    assert "demo-template-grid" in html
+    assert "sample-group-title" not in html
+    template_static_section = html[html.index("function renderDemoCaseTemplates") : html.index("function clearCustomerPackageSelection")]
+    assert "REPORT_VERDICT_LABELS" not in template_static_section
+    assert "expected_customer_verdict" not in template_static_section
+    assert "可进入下一步" not in template_static_section
+    assert "需补充资料" not in template_static_section
+    assert "需人工复核" not in template_static_section
+    assert "不建议准入" not in template_static_section
+    assert "${groups\n            .map" not in template_static_section
+    assert "resetCurrentCase" in html
+    assert 'id="resetCurrentCase"' in html
+    assert "resetCustomerWorkbenchState" in html
+    assert "$(\"uploadTitle\").value = \"\";" in html
+    assert "$(\"packagePrecheck\").innerHTML" in html
+    assert "$(\"customerReport\").innerHTML" in html
+    assert "客户结论" not in html[html.index('id="customerWorkbench"') : html.index('id="adminWorkbench"')]
+    assert "预审结论" in html
+
+
+def test_report_html_uses_platform_conclusion_copy_and_pdf_print_layout() -> None:
+    from app.reporting import render_customer_report_html
+
+    report = {
+        "schema_version": "customer_report.v1",
+        "report_metadata": {"case_id": "case_report_copy", "run_id": "run_report_copy", "generated_at": "2026-05-13T00:00:00+00:00"},
+        "case_profile": {"title": "报告文案与 PDF 版式验证", "target_markets": ["CN", "EU"]},
+        "verdict": "needs_supplement",
+        "verdict_label": "需补充资料",
+        "executive_summary": {"issue_count": 1, "supplement_count": 1, "needs_review_count": 0, "not_approved_count": 0},
+        "summary": "用于验证报告文案和打印版式。",
+        "selected_checks": [{"id": "intake_readiness", "label": "资料完整性与可审性"}],
+        "issue_groups": [],
+    }
+
+    html = render_customer_report_html(report)
+
+    assert "客户结论" not in html
+    assert "预审结论" in html
+    assert "<span>复核事项</span><strong>0</strong>" in html
+    assert "<span>不建议准入</span><strong>0</strong>" in html
+    assert "@page" in html
+    assert "size: A4" in html
+    assert "print-color-adjust: exact" in html
+    assert "page-break-inside: avoid" in html
+    assert html.rindex("@media print") > html.rindex("@media (max-width: 760px)")
+
+
+def test_report_pdf_chrome_export_disables_browser_headers() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "reporting.py").read_text(encoding="utf-8")
+
+    assert "--no-pdf-header-footer" in source
+    assert "--print-to-pdf-no-header" in source
+    assert 'display_header_footer=False' in source
+
+
+def test_superpowers_brainstorm_artifacts_are_gitignored() -> None:
+    gitignore = Path(__file__).resolve().parents[2] / ".gitignore"
+
+    assert ".superpowers/" in gitignore.read_text(encoding="utf-8")
 
 
 def _upload_package(client: TestClient, sample_id: str, data: dict[str, str]) -> dict:

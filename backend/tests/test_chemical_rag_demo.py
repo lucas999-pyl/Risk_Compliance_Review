@@ -174,6 +174,25 @@ def test_expanded_chemical_cases_cover_distinct_risk_scenarios(tmp_path: Path) -
         assert payload["retrieval"]["chunks"], case_id
 
 
+def test_new_realistic_demo_cases_cover_upload_template_scenarios(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+    _ingest_rules(client)
+    expected = {
+        "chemical_supplier_statement_test_conflict": ("复核", "supplier_evidence_conflict"),
+        "chemical_eu_svhc_single_market": ("复核", "svhc_threshold_match"),
+        "chemical_cn_hazardous_review": ("复核", "hazardous_catalog_match"),
+        "chemical_scanned_unreadable_package": ("复核", "sds_missing_sections"),
+        "chemical_storage_transport_supplement": ("复核", "flammable_storage_missing"),
+        "chemical_cross_file_cas_concentration_conflict": ("复核", "cross_file_identity_conflict"),
+    }
+
+    for case_id, (verdict, rule_id) in expected.items():
+        payload = client.post("/chemical/runs", json={"case_id": case_id, "top_k": 6}).json()
+        assert payload["verdict"] == verdict, case_id
+        assert payload["evaluation"]["verdict_matched"] is True, case_id
+        assert any(hit["rule_id"] == rule_id for hit in payload["rule_hits"]), case_id
+
+
 def test_chemical_evaluation_summarizes_verdict_quality(tmp_path: Path) -> None:
     client = _make_client(tmp_path)
     _ingest_rules(client)

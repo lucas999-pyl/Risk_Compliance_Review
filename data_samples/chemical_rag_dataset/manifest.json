@@ -150,6 +150,78 @@
       "expected_verdict": "不合规",
       "expected_review": false,
       "expected_rules": ["enterprise_redline_benzene"]
+    },
+    {
+      "case_id": "chemical_supplier_statement_test_conflict",
+      "title": "供应商声明与检测报告不一致复核",
+      "scenario_tags": ["供应商声明", "检测报告", "证据不一致"],
+      "target_markets": ["CN", "EU"],
+      "sds_path": "documents/supplier_statement_test_conflict_sds.txt",
+      "formula_path": "documents/supplier_statement_test_conflict_formula.txt",
+      "process_path": "documents/supplier_statement_test_conflict_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["supplier_evidence_conflict"]
+    },
+    {
+      "case_id": "chemical_eu_svhc_single_market",
+      "title": "EU 单市场 SVHC 阈值复核",
+      "scenario_tags": ["EU", "SVHC", "阈值复核"],
+      "target_markets": ["EU"],
+      "sds_path": "documents/eu_svhc_single_market_sds.txt",
+      "formula_path": "documents/eu_svhc_single_market_formula.txt",
+      "process_path": "documents/eu_svhc_single_market_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["svhc_threshold_match"]
+    },
+    {
+      "case_id": "chemical_cn_hazardous_review",
+      "title": "CN 危化目录命中但需用途复核",
+      "scenario_tags": ["CN", "危化目录", "用途复核"],
+      "target_markets": ["CN"],
+      "sds_path": "documents/cn_hazardous_review_sds.txt",
+      "formula_path": "documents/cn_hazardous_review_formula.txt",
+      "process_path": "documents/cn_hazardous_review_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["hazardous_catalog_match"]
+    },
+    {
+      "case_id": "chemical_scanned_unreadable_package",
+      "title": "扫描 PDF 不可读资料包补件",
+      "scenario_tags": ["扫描PDF", "不可读", "补件"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/scanned_unreadable_package_sds.txt",
+      "formula_path": "documents/scanned_unreadable_package_formula.txt",
+      "process_path": "documents/scanned_unreadable_package_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["sds_missing_sections", "formula_components_missing"]
+    },
+    {
+      "case_id": "chemical_storage_transport_supplement",
+      "title": "储运文件单独补充前的可燃液体复核",
+      "scenario_tags": ["储运资料", "可燃液体", "现场安全"],
+      "target_markets": ["CN", "US"],
+      "sds_path": "documents/storage_transport_supplement_sds.txt",
+      "formula_path": "documents/storage_transport_supplement_formula.txt",
+      "process_path": "documents/storage_transport_supplement_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["flammable_storage_missing"]
+    },
+    {
+      "case_id": "chemical_cross_file_cas_concentration_conflict",
+      "title": "跨文件 CAS/浓度冲突复核",
+      "scenario_tags": ["跨文件冲突", "CAS", "浓度"],
+      "target_markets": ["CN", "EU", "US"],
+      "sds_path": "documents/cross_file_cas_concentration_conflict_sds.txt",
+      "formula_path": "documents/cross_file_cas_concentration_conflict_formula.txt",
+      "process_path": "documents/cross_file_cas_concentration_conflict_process.txt",
+      "expected_verdict": "复核",
+      "expected_review": true,
+      "expected_rules": ["cross_file_identity_conflict"]
     }
   ]
 }

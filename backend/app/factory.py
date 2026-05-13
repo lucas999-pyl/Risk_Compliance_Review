@@ -4,7 +4,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import (
@@ -27,6 +27,8 @@ from app.models import (
 )
 from app.ai_clients import AIClientConfig, EmbeddingClient
 from app.chemical_rag import ChemicalRagRunner, CHECK_TYPE_LABELS, LEGACY_CHECK_TYPE_MAP, SCENARIO_RECOMMENDED_CHECK_TYPES
+from app.demo_cases import demo_case_catalog
+from app import reporting
 from app.service import ComplianceReviewService
 from app.settings import Settings
 from app.store import SQLiteStore
@@ -91,6 +93,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sample_path = (sample_dir / filename).resolve()
         if sample_path.parent != sample_dir.resolve() or not sample_path.exists():
             raise HTTPException(status_code=404, detail="Sample file not found")
+        return FileResponse(sample_path)
+
+    @app.get("/data_samples/chemical_rag_dataset/documents/{filename}", include_in_schema=False)
+    def chemical_dataset_document(filename: str) -> FileResponse:
+        sample_dir = Path(__file__).resolve().parents[2] / "data_samples" / "chemical_rag_dataset" / "documents"
+        sample_path = (sample_dir / filename).resolve()
+        if sample_path.parent != sample_dir.resolve() or not sample_path.exists():
+            raise HTTPException(status_code=404, detail="Dataset file not found")
         return FileResponse(sample_path)
 
     @app.get("/data_samples/chemical_knowledge_sources/official_pack_2026_05/{filename}", include_in_schema=False)
@@ -260,6 +270,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict:
         return runner.retrieval_preview(payload.case_id, top_k=payload.top_k)
 
+    @app.get("/chemical/demo-cases")
+    def chemical_demo_cases() -> dict:
+        return demo_case_catalog()
+
     @app.get("/chemical/cases")
     def chemical_case_list() -> dict:
         return {"cases": store.list_cases()}
@@ -295,6 +309,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "latest_report": latest_payload,
             "package_precheck": latest_payload.get("package_precheck") if latest_payload else None,
         }
+
+    @app.get("/chemical/cases/{case_id}/report.json")
+    def chemical_case_report_json(case_id: str) -> JSONResponse:
+        report = _latest_customer_report_or_404(store, case_id)
+        return JSONResponse(report, headers={"Content-Disposition": f'attachment; filename="{reporting.customer_report_filename(report, "json")}"'})
+
+    @app.get("/chemical/cases/{case_id}/report.html")
+    def chemical_case_report_html(case_id: str) -> Response:
+        report = _latest_customer_report_or_404(store, case_id)
+        return Response(
+            content=reporting.render_customer_report_html(report),
+            media_type="text/html; charset=utf-8",
+            headers={"Content-Disposition": f'inline; filename="{reporting.customer_report_filename(report, "html")}"'},
+        )
+
+    @app.get("/chemical/cases/{case_id}/report.pdf")
+    async def chemical_case_report_pdf(case_id: str) -> Response:
+        report = _latest_customer_report_or_404(store, case_id)
+        try:
+            pdf = await reporting.render_customer_report_pdf_async(report)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{reporting.customer_report_filename(report, "pdf")}"'},
+        )
 
     @app.post("/chemical/cases/{case_id}/documents", status_code=201)
     async def chemical_case_upload_documents(
@@ -526,6 +567,16 @@ def _documents_for_runner(store: SQLiteStore, case_id: str) -> list[dict]:
             }
         )
     return documents
+
+
+def _latest_customer_report_or_404(store: SQLiteStore, case_id: str) -> dict:
+    if not store.get_case(case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
+    latest = store.latest_report(case_id)
+    report = reporting.latest_customer_report(latest["payload"] if latest else None)
+    if not report:
+        raise HTTPException(status_code=404, detail="Case has no customer report")
+    return report
 
 
 def _persist_case_review(store: SQLiteStore, case_id: str, trace: dict) -> None:

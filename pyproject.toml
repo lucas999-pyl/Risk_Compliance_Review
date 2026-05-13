@@ -24,6 +24,9 @@ agents = [
   "langgraph>=0.2.60",
   "litellm>=1.55.0",
 ]
+reports = [
+  "playwright>=1.45.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]

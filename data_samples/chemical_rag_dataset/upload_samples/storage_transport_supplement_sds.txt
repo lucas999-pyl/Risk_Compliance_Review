@@ -1,0 +1,36 @@
+产品名称：Acetone Storage Review Cleaner
+供应商：Storage Demo Supplier
+修订日期：2026-02-10
+1. Identification
+Acetone cleaner.
+2. Hazard identification
+Flammable liquid H225.
+3. Composition/information on ingredients
+Acetone CAS 67-64-1 30%
+Water CAS 7732-18-5 70%
+4. First-aid measures
+Move to fresh air.
+5. Fire-fighting measures
+Use foam.
+6. Accidental release measures
+Remove ignition sources.
+7. Handling and storage
+现场储存条件未提供。
+8. Exposure controls/personal protection
+Use PPE.
+9. Physical and chemical properties
+Liquid.
+10. Stability and reactivity
+Stable.
+11. Toxicological information
+Demo data.
+12. Ecological information
+Demo data.
+13. Disposal considerations
+Dispose properly.
+14. Transport information
+UN 1993.
+15. Regulatory information
+CN/US review.
+16. Other information
+End.
