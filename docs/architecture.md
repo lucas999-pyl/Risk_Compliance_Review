@@ -1,63 +1,66 @@
 # 架构说明
 
-## 主流程
+## 当前形态
 
-系统使用“知识库源文档上传 + 客户级资料包预审”作为主流程。普通用户不需要手写审查任务，而是提交一个审查项目，选择审查场景和固定检查项：
+系统当前采用“模块化静态前端 + FastAPI 后端 + SQLite 本地存储 + 本地 RAG/规则引擎”的形态。普通用户通过 Case 工作台完成资料包上传、预检、审查范围确认、自动预审和报告下载；管理端用于知识库、RAG 证据、Agent 分支和 trace 排查。
 
-1. 上传知识库：上传 `manifest_file` 和多份 `source_files`，包括 OSHA、ECHA、EPA、MEM 和内部禁忌矩阵源文档。
-2. 构建知识库：解析源文档，生成 chunk，绑定 source_url、version、effective_date、retrieved_at、document_role，并写入 SQLite 向量索引。
-3. 提交审查项目：选择 `review_scenario`、`check_types`、`target_markets`，上传一个或多个资料文件。
-4. 资料包软门禁预检：系统先识别每个文件的资料类型、可读性、已识别字段和缺失字段；未知文件不会被强行归为 SDS。
-5. 资料包标准化：系统把资料包中可信文件映射到 SDS、配方表、工艺说明槽位；缺失槽位进入补件判断。
-6. 资料解析：抽取 SDS 章节、CAS/EC、浓度、GHS H/P、UN 编号、供应商、修订日期、温度、压力、储存条件。
-7. 资料完整性预检：用确定性规则计算完整性评分、阻断性缺口和补件动作。
-8. 任务路由：按业务化 `check_types` 只拆解用户选择的资料可审性、成分识别、禁限用、相容性、SDS、工艺、储运、法规、声明一致性和复核建议子任务。
-8. RAG 检索：执行向量召回、keyword/CAS exact match 和规则 Rerank，保留 TopK 证据。
-9. 多 Agent 判断：各 Agent 基于对应 query、召回证据和规则输出三值判断。
-10. 输出分层：普通用户查看 `customer_report`；管理端查看 `technical_trace`、RAG、Agent 分支和 trace。
+## 前端架构
 
-## 核心契约
-
-上传审查主接口：
+入口：
 
 ```text
-POST /chemical/upload-review
+backend/app/static/index.html
 ```
 
-普通用户字段：
+主要模块：
 
-- `review_scenario`
-- `check_types`
-- `target_markets`
-- `documents`，可上传单文件或多文件资料包
+- `static/js/router.js`：hash 路由。
+- `static/js/shell.js`：顶部栏、侧边栏、角色切换和页面壳。
+- `static/js/api.js`：后端 API 封装。
+- `static/pages/case-board/`：Case 看板，支持 Case 删除。
+- `static/pages/wizard/`：新建 Case、上传资料、预检、范围确认、Step 5 自动运行预审。
+- `static/pages/report/`：客户报告页、PDF 下载入口、管理端抽屉。
+- `static/pages/admin-kb/`：知识库管理、检索、chunk 查看、导入和清空。
+- `static/pages/admin-trace/`：管理端审查轨迹。
+- `static/legacy.html`：旧版调试入口。
+- `static/print/`：PDF 打印模板。
 
-兼容/管理端字段：
+报告页当前不再展示“审查范围已变更”的黄色提示；即使 Case 内部存在 `range_dirty`，已有报告也按正常报告展示。
 
-- `review_task`
-- `sds_file`
-- `formula_file`
-- `process_file`
+## 后端架构
 
-上传审查主响应包含：
+核心模块：
 
-- `review_scenario`
-- `check_types`
-- `customer_report`
-- `package_precheck`
-- `review_workbench.document_quality`
-- `review_workbench.supplement_actions`
-- `review_workbench.risk_items`
-- `technical_trace`
-- `task_decomposition`
-- `rag_queries`
-- `agent_branches`
-- `retrieval.chunks`
-- `rule_hits`
-- `trace.nodes`
+- `backend/app/factory.py`：FastAPI app、静态资源、Case API、知识库 API、PDF 路由。
+- `backend/app/chemical_rag.py`：化工 RAG、规则命中、资料预检、Agent 分支、客户报告生成。
+- `backend/app/document_parser.py`：上传文件解析和文本提取。
+- `backend/app/store.py`：SQLite Case、文档、报告、知识源、chunk 和向量索引存储。
+- `backend/app/pdf_render.py`：HTML/PDF 报告渲染。
+- `backend/app/chemistry.py`：物质主数据和化学属性辅助。
+- `backend/app/settings.py`：配置。
+
+## 主流程
+
+```text
+创建 Case
+-> 上传单文件或多文件资料包
+-> 资料包预检 package_precheck
+-> 资料槽位标准化：安全技术说明书 / 配方 / 工艺 / 其他资料
+-> 资料解析与字段抽取
+-> 资料完整性门禁 document_quality
+-> 按 review_scenario + check_types 路由任务
+-> RAG 检索与规则召回
+-> 多 Agent 分支判断
+-> 主审汇总
+-> customer_report 客户报告 + technical_trace 管理端证据
+-> 写入 SQLite Case / Report
+```
+
+资料不足不会直接拒绝上传。系统采用软门禁：允许继续预审，但在 `package_precheck`、`document_quality` 和 `customer_report` 中明确哪些结论可靠、哪些只能复核、哪些必须补件。
 
 ## 资料包预检
 
-`package_precheck` 是上传后的第一阶段输出，用于告诉用户系统读懂了什么、缺什么、哪些检查可靠。它采用软门禁：除非没有上传文件或文件完全不可读，否则允许继续初筛，但会把受限范围写清楚。
+`package_precheck` 是上传后的第一阶段输出，用于告诉用户系统读懂了什么、缺什么、哪些检查可靠。
 
 每个文件包含：
 
@@ -76,19 +79,27 @@ POST /chemical/upload-review
 - `limited_checks`
 - `blocked_checks`
 - `supplement_actions`
-- `overall_status`: `ready | partial | needs_supplement | unreadable`
+- `overall_status`
+
+扫描件或不可读资料不会被强行当成安全技术说明书，会进入补件或复核路径。
 
 ## 检查项
 
-一级场景包括供应商准入预审、替代物料评估、目标市场合规筛查、工艺导入风险评估、储运与现场安全评估。系统按场景默认勾选推荐检查项，用户可手动调整。
+一级场景：
 
-二级检查项包括：
+- 市场准入预审
+- 替代物料评估
+- 供应商资料准入
+- 工艺导入风险评估
+- 储运与现场安全评估
+
+二级检查项：
 
 - 资料完整性与可审性
-- 成分识别与 CAS/浓度完整性
+- 成分识别与登记号/浓度完整性
 - 禁限用物质与红线物质筛查
 - 物料相容性与危险组合
-- SDS 关键章节核查
+- 安全技术说明书关键章节核查
 - 工艺条件适配性
 - 储存与运输条件核查
 - 目标市场法规匹配
@@ -97,19 +108,29 @@ POST /chemical/upload-review
 
 旧的 `document_completeness/material/process/storage/regulatory` 仍兼容接收，并自动映射到新版业务检查项。
 
+## RAG 与规则
+
+系统使用混合召回：
+
+- 向量召回
+- keyword 匹配
+- 登记号 exact match
+- jurisdiction/domain keyword rerank
+- 规则包命中
+
+知识库未加载时，上传审查不会无证据放行，会输出复核或补件相关结论。
+
 ## 客户报告
 
-`customer_report` 是普通用户主视图，只展示不合格、复核和补件事项。合规项不展开为技术列表。报告先说明 `review_scope`：资料包是否足以支撑本次审查、哪些检查可直接完成、哪些检查受资料缺失影响、哪些需要补件。
+`customer_report` 是普通用户主视图，当前结构为 `customer_report.v1`。客户报告只展开不合格、复核和补件事项，合规项只做摘要。
 
-当前客户报告采用 `customer_report.v1` 稳定结构，便于前端、审批流和审计系统消费。顶层包含：
+报告展示约束：
 
-- `report_metadata`：报告类型、Case ID、运行 ID、生成时间、语言。
-- `case_profile`：Case 标题、审查场景、目标市场、所选检查项。
-- `executive_summary`：结论、摘要、问题数量、补件数量。
-- `review_scope`：资料包状态、可完成检查、受限检查、阻断检查、缺失资料。
-- `issue_groups`：按资料完整性、物料、工艺、储运、法规等维度分组。
-- `supplement_actions`、`next_actions`、`limitations`。
-- `evidence_policy` 与 `technical_reference`：说明客户报告与管理端技术证据的边界。
+- `rule_text` 用业务准入口径，不直接暴露内部规则 ID。
+- `user_text` 优先引用用户上传资料原文。
+- 常见英文规则标签在展示层映射为中文。
+- “执行要求”在 HTML/PDF 中红色强调。
+- 管理端证据不进入客户报告正文。
 
 每条问题包含：
 
@@ -118,43 +139,48 @@ POST /chemical/upload-review
 - 严重度
 - 问题分类
 - 原因
-- 规则编号
-- 规则原文
+- 规则 ID 和中文规则名
+- 业务化规则说明
 - 用户原文
 - 影响说明
 - 整改建议
 
-问题按资料完整性、物料、工艺、储运、法规分组。RAG chunk、rerank、agent 分支、trace 节点只进入管理端技术信息。
+## PDF 生成
 
-更完整的端到端处理逻辑见 `docs/case_workbench_review_logic.md`。
+PDF 路由：
 
-## 资料完整性策略
+```text
+GET /api/cases/{case_id}/report.pdf
+```
 
-资料完整性分为两层：
+生成顺序：
 
-- 确定性预检：文件类型、SDS 16 章节、供应商、修订日期、CAS、浓度、工艺温度、压力、关键步骤和储存条件。
-- 语义充分性复核：字段存在但内容不足、跨文件矛盾、资料无法支撑所选审查目标时，保留 LLM/Agent 辅助判断空间。
+1. Playwright Chromium 渲染 `static/print/case-report.html`。
+2. Playwright 不可用时，调用系统 Chrome/Edge headless。
+3. 浏览器不可用时，使用内置文本 PDF fallback。
 
-当前实现已把确定性预检作为 Agent 前置门禁，并通过 `document_quality`、`supplement_actions` 和 `customer_report` 影响最终输出。
+## 数据与样例
 
-## 保守策略
-
-未上传知识库时，上传审查必须输出 `复核`，原因是“知识库未加载，不能形成证据充分的预审结论”。内置评测集仅用于回归验证，不作为上传审查结论来源。
+- `data_samples/chemical_knowledge_sources/official_pack_2026_05/`：官方知识源样例。
+- `data_samples/chemical_rag_dataset/manifest.json`：合成回归集，当前 26 个 Case。
+- `data_samples/chemical_rag_dataset/upload_samples/`：页面演示上传包，当前 14 个文件夹样例。
+- `data_samples/chemical_rag_dataset/knowledge/chemical_rules_pack.json`：开发备用规则包。
+- `data/`：本地运行数据，不提交。
 
 ## 当前适配器
 
 - 存储：SQLite + 本地文件目录。
 - 向量库：SQLite 向量索引。
-- Embedding：优先 OpenAI-compatible/Qwen；不可用时 hash embedding 降级。
-- LLM：可接入 Qwen3.6-plus，用于 Agent 解释，不覆盖硬规则。
-- PDF：仅支持文本型 PDF；扫描件进入复核。
-- 前端：静态工作台，普通用户端和管理端调试信息先在同一页面内分层。
+- Embedding：OpenAI-compatible/Qwen 优先，不可用时 hash embedding 降级。
+- LLM：可选接入，用于 Agent 解释，不覆盖硬规则。
+- PDF：Playwright、系统浏览器、内置 fallback 三层。
+- 前端：模块化静态页面，客户端和管理端分层。
 
 ## 生产化替换方向
 
 1. SQLite 替换为 PostgreSQL + pgvector，并引入迁移工具。
 2. 本地文件替换为 MinIO 或企业对象存储。
-3. 同步工作流替换为队列 + LangGraph 状态图。
-4. 当前 rules rerank 增强为 dense + sparse + cross-encoder rerank。
+3. 同步审查替换为队列 + LangGraph 状态图。
+4. 当前 rerank 增强为 dense + sparse + cross-encoder rerank。
 5. 文档解析接入专业 PDF/表格/OCR 管线。
 6. 人工复核接入用户、角色、权限、审批流和不可变审计日志。
