@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, HttpUrl
 
 
-Jurisdiction = Literal["CN", "EU", "US", "GLOBAL"]
+Jurisdiction = Literal["CN", "EU", "US", "KR", "JP", "GLOBAL"]
 Severity = Literal["info", "low", "medium", "high", "critical", "review"]
 ReviewDecision = Literal["approved", "edited", "rejected"]
 

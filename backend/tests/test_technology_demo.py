@@ -71,7 +71,7 @@ def test_technology_evaluation_summarizes_golden_dataset(tmp_path: Path) -> None
 def test_static_workbench_contains_technology_demo_tabs(tmp_path: Path) -> None:
     client = _make_client(tmp_path)
 
-    response = client.get("/")
+    response = client.get("/legacy")
 
     assert response.status_code == 200
     assert "化工合规 RAG 工具" in response.text

@@ -1,0 +1,292 @@
+/* 化工合规审查报告 · 打印态样式
+   严格按 spec §8.2 + 12/13 设计稿 `.sheet` 内部 token。
+   A4 纵向 / 上下 25mm / 左右 20mm / body 11pt / heading 14pt / hero 24pt
+   单色 Action Blue #0066cc 印刷下保留；状态用「色块 + 实/虚线 + 实/网纹 glyph」三重编码
+   禁止 backdrop-filter / box-shadow / filter:blur（chromium PDF 渲染会糊）
+*/
+
+@page {
+  size: A4;
+  margin: 25mm 20mm;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #fff;
+  color: #1d1d1f;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "SF Pro Text", system-ui, -apple-system, sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* 单 sheet 容器（A4 内部留白由 @page margin 接管，sheet 自身不再加 padding） */
+.sheet {
+  width: 100%;
+  color: #1d1d1f;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "SF Pro Text", system-ui, -apple-system, sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+}
+
+.sheet .head-meta {
+  font-size: 10pt;
+  color: #7a7a7a;
+  letter-spacing: -0.08px;
+}
+
+.sheet h1 {
+  font-family: "PingFang SC", "Noto Sans CJK SC", "SF Pro Display", system-ui, sans-serif;
+  font-size: 24pt;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+  margin-top: 8px;
+  color: #1d1d1f;
+}
+
+.sheet .sub {
+  font-size: 11pt;
+  color: #7a7a7a;
+  margin-top: 8px;
+  letter-spacing: -0.224px;
+}
+.sheet .sub span + span::before {
+  content: " · ";
+  color: #cccccc;
+}
+
+.sheet hr {
+  border: none;
+  border-top: 0.5pt solid #cccccc;
+  margin: 22px 0;
+}
+
+.sheet h2 {
+  font-size: 14pt;
+  font-weight: 600;
+  margin-bottom: 12px;
+  letter-spacing: -0.374px;
+  color: #1d1d1f;
+}
+
+/* 结论盒 —— 灰度三重编码：色块 + 实/虚线 + 实/网纹 glyph */
+.conclude-box {
+  border: 1.5pt solid #1d1d1f;
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: center;
+  page-break-inside: avoid;
+}
+.conclude-box .badge {
+  font-size: 18pt;
+  font-weight: 600;
+  letter-spacing: -0.374px;
+  padding: 6px 16px;
+  border: 1.5pt solid #1d1d1f;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+.conclude-box .badge .glyph {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1d1d1f;
+  display: inline-block;
+}
+/* pass · 实心圆 + 实线边 */
+.conclude-box .badge.pass { border-style: solid; }
+.conclude-box .badge.pass .glyph { background: #1d1d1f; }
+/* needs_review · 虚线 + 网纹 */
+.conclude-box .badge.warn { border-style: dashed; }
+.conclude-box .badge.warn .glyph {
+  background: repeating-linear-gradient(45deg, #1d1d1f 0 2px, #fff 2px 4px);
+}
+/* needs_supplement · 点线 + 半网纹 */
+.conclude-box .badge.supp { border-style: dotted; }
+.conclude-box .badge.supp .glyph {
+  background: repeating-linear-gradient(0deg, #1d1d1f 0 2px, #fff 2px 4px);
+}
+/* not_approved · 双实线 + 实心 */
+.conclude-box .badge.block { border-style: double; border-width: 3pt; }
+.conclude-box .badge.block .glyph { background: #1d1d1f; }
+
+.conclude-box .summary {
+  font-size: 11pt;
+  color: #1d1d1f;
+  letter-spacing: -0.224px;
+  line-height: 1.55;
+}
+
+/* 资料清单 */
+.file-list { margin-top: 6px; }
+.file-list .item {
+  padding: 8px 0;
+  border-bottom: 0.5pt solid #e0e0e0;
+  font-size: 11pt;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  page-break-inside: avoid;
+}
+.file-list .item:last-child { border-bottom: none; }
+.file-list .item .nm {
+  font-weight: 600;
+  letter-spacing: -0.224px;
+}
+.file-list .item .nm small {
+  display: block;
+  font-weight: 400;
+  color: #7a7a7a;
+  font-size: 10pt;
+  margin-top: 2px;
+}
+.file-list .item .meta {
+  font-size: 10pt;
+  color: #7a7a7a;
+  text-align: right;
+  letter-spacing: -0.08px;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.empty-line {
+  font-size: 11pt;
+  color: #7a7a7a;
+  padding: 6px 0;
+}
+
+/* finding 条 */
+.pf-find {
+  padding: 16px 0;
+  border-bottom: 0.5pt solid #cccccc;
+  display: grid;
+  grid-template-columns: 44px 1fr 92px;
+  gap: 16px;
+  align-items: start;
+  page-break-inside: avoid;
+}
+.pf-find:last-child { border-bottom: none; }
+.pf-find .num {
+  font-family: "PingFang SC", "Noto Sans CJK SC", "SF Pro Display", system-ui, sans-serif;
+  font-size: 22pt;
+  font-weight: 600;
+  color: #1d1d1f;
+  line-height: 1;
+  letter-spacing: -0.4px;
+}
+.pf-find .body .row {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 11pt;
+  line-height: 1.55;
+}
+.pf-find .body .row .k {
+  color: #7a7a7a;
+  font-size: 10pt;
+  letter-spacing: -0.08px;
+}
+.pf-find .body .row .v {
+  color: #1d1d1f;
+  letter-spacing: -0.224px;
+}
+.pf-find .body .row .v .rid { font-weight: 600; }
+.pf-find .body .row .v .quote {
+  display: block;
+  padding: 6px 12px;
+  background: #f5f5f7;
+  border-left: 1.5pt solid #1d1d1f;
+  margin-top: 4px;
+  font-size: 10.5pt;
+  color: #333;
+}
+.pf-find .body .row .v .quote .quote-supplement {
+  display: block;
+  margin-top: 3px;
+  color: #c01818;
+  font-weight: 600;
+}
+
+.pf-find .sev {
+  font-size: 10pt;
+  font-weight: 600;
+  letter-spacing: -0.08px;
+  text-align: right;
+  line-height: 1.5;
+}
+.pf-find .sev .sev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1pt solid #1d1d1f;
+  white-space: nowrap;
+}
+.pf-find .sev .sev-badge.warn { border-style: dashed; }
+.pf-find .sev .sev-badge.supp { border-style: dotted; }
+.pf-find .sev .sev-badge.block { border-style: double; border-width: 2pt; }
+.pf-find .sev .glyph {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1d1d1f;
+}
+.pf-find .sev .glyph.warn {
+  background: repeating-linear-gradient(45deg, #1d1d1f 0 1.5px, #fff 1.5px 3px);
+}
+.pf-find .sev .glyph.supp {
+  background: repeating-linear-gradient(0deg, #1d1d1f 0 1.5px, #fff 1.5px 3px);
+}
+
+/* 签发位 */
+.signoff {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  page-break-inside: avoid;
+}
+.signoff .col .lab {
+  font-size: 10pt;
+  color: #7a7a7a;
+  letter-spacing: -0.08px;
+  margin-bottom: 12px;
+}
+.signoff .col .line {
+  border-bottom: 0.5pt solid #1d1d1f;
+  height: 28px;
+}
+.signoff .col .date {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10pt;
+  color: #7a7a7a;
+  letter-spacing: -0.08px;
+}
+.signoff .col .date .ln {
+  border-bottom: 0.5pt solid #1d1d1f;
+  flex: 1;
+  margin-left: 16px;
+}
+
+.disclaimer {
+  margin-top: 20px;
+  font-size: 9pt;
+  color: #7a7a7a;
+  line-height: 1.5;
+  letter-spacing: -0.08px;
+}
+
+/* 章节切页：标题不与下一行被切断 */
+h2 { page-break-after: avoid; }

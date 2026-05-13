@@ -1,0 +1,2243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>化工合规 RAG 工具</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f3;
+        --panel: #ffffff;
+        --ink: #1b2521;
+        --muted: #61706a;
+        --line: #ced8d1;
+        --brand: #246b54;
+        --brand-soft: #e8f3ee;
+        --warn: #a15c06;
+        --warn-soft: #fff4df;
+        --danger: #b42318;
+        --danger-soft: #fee4e2;
+        --ok: #067647;
+        --ok-soft: #dcfae6;
+        --code: #16201b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(135deg, rgba(36, 107, 84, 0.1), transparent 36%),
+          repeating-linear-gradient(90deg, rgba(27, 37, 33, 0.03) 0 1px, transparent 1px 30px),
+          var(--bg);
+        color: var(--ink);
+        font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        align-items: center;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(320px, 390px) minmax(0, 1fr) minmax(380px, 460px);
+        gap: 14px;
+        max-width: 1860px;
+        margin: 0 auto;
+        padding: 14px;
+      }
+
+      section {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.96);
+        overflow: clip;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfa;
+      }
+
+      .body {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .status {
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 36px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 8px 11px;
+        background: var(--brand);
+        color: #fff;
+        font: inherit;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      button.secondary,
+      .tab,
+      .sample-button {
+        border-color: var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+
+      button.danger {
+        background: var(--danger);
+      }
+
+      .knowledge-pack-note {
+        display: grid;
+        gap: 4px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .knowledge-pack-note code {
+        color: var(--ink);
+        font-weight: 800;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .task-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: -4px;
+      }
+
+      .suggestion-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 8px;
+        color: var(--muted);
+        background: #f8faf8;
+        font-size: 12px;
+        line-height: 1.2;
+      }
+
+      .suggestion-chip input {
+        width: auto;
+        min-height: auto;
+        margin: 0;
+      }
+
+      .tabs,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tab.active {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .collapse-toggle {
+        display: flex;
+        width: 100%;
+        min-height: 38px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fbfcfa;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .collapse-toggle::after {
+        content: "▾";
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .collapse-toggle[aria-expanded="false"]::after {
+        content: "▸";
+      }
+
+      .collapsible {
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .collapsed,
+      .collapsible.collapsed {
+        display: none !important;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .metric-grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .metric,
+      .node,
+      .chunk,
+      .rule,
+      .case-row,
+      .agent,
+      .evidence,
+      .check-item,
+      .risk-item,
+      .report-card,
+      .verdict-card,
+      .source-row,
+      .pipeline-step {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .metric,
+      .agent,
+      .evidence,
+      .check-item,
+      .risk-item,
+      .report-card,
+      .verdict-card,
+      .source-row,
+      .pipeline-step {
+        padding: 10px;
+      }
+
+      .metric span,
+      .agent span,
+      .evidence span,
+      .check-item span,
+      .risk-item span,
+      .case-row span,
+      .source-row span,
+      .pipeline-step span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 21px;
+        overflow-wrap: anywhere;
+      }
+
+      .verdict-card {
+        display: grid;
+        gap: 8px;
+      }
+
+      .verdict-card strong {
+        font-size: 28px;
+      }
+
+      .verdict-card.ok {
+        border-color: #73c79a;
+        background: var(--ok-soft);
+      }
+
+      .verdict-card.review {
+        border-color: #f0b15c;
+        background: var(--warn-soft);
+      }
+
+      .verdict-card.bad {
+        border-color: #f97066;
+        background: var(--danger-soft);
+      }
+
+      .agent-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .check-option-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .check-option {
+        display: grid;
+        gap: 4px;
+        min-height: 78px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px;
+        background: #fff;
+      }
+
+      .check-option input {
+        width: auto;
+        min-height: auto;
+      }
+
+      .checklist-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .check-item.missing {
+        border-color: #f0b15c;
+        background: var(--warn-soft);
+      }
+
+      .risk-item {
+        display: grid;
+        gap: 8px;
+        cursor: pointer;
+      }
+
+      .risk-item.active {
+        border-color: var(--brand);
+        box-shadow: inset 3px 0 0 var(--brand);
+      }
+
+      .risk-item.high {
+        border-color: #f97066;
+        background: var(--danger-soft);
+      }
+
+      .risk-item.review {
+        border-color: #f0b15c;
+        background: var(--warn-soft);
+      }
+
+      .report-card {
+        display: grid;
+        gap: 10px;
+      }
+
+      .report-card ul {
+        margin: 4px 0 0;
+        padding-left: 18px;
+      }
+
+      .agent,
+      .graph,
+      .source-list,
+      .pipeline,
+      .list {
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .sample-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .sample-button {
+        min-height: 52px;
+        text-align: left;
+      }
+
+      .node {
+        display: grid;
+        grid-template-columns: 34px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .node.active {
+        border-color: var(--brand);
+        box-shadow: inset 3px 0 0 var(--brand);
+      }
+
+      .node-index {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-weight: 900;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 22px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .tag.review {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .tag.bad {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .tag.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+
+      .chunk,
+      .rule,
+      .case-row {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .detail-panel {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .chunk code,
+      .rule code,
+      .source-row code,
+      .agent code,
+      .detail-panel,
+      .evidence,
+      .evidence p,
+      .evidence span,
+      .check-item,
+      .risk-item,
+      .report-card,
+      .pipeline-step span,
+      .chunk span,
+      .rule strong,
+      .chunk strong,
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      pre {
+        width: 100%;
+        max-height: 320px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border-radius: 8px;
+        background: var(--code);
+        color: #eef8f1;
+        font-size: 12px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .mode-switch {
+        display: inline-flex;
+        gap: 6px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .mode-switch button {
+        min-height: 30px;
+      }
+
+      .mode-switch button.active {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      main {
+        display: block;
+        max-width: 1480px;
+      }
+
+      .customer-shell {
+        display: grid;
+        grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      .case-flow {
+        display: grid;
+        gap: 14px;
+      }
+
+      .case-topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .workflow-steps {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .workflow-step {
+        min-height: 66px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .workflow-step strong,
+      .flow-step h3 {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .workflow-step.active {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+      }
+
+      .flow-step {
+        display: grid;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.96);
+        padding: 14px;
+      }
+
+      .flow-step-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .action-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .admin-workbench {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.96);
+        overflow: clip;
+      }
+
+      .admin-grid {
+        display: grid;
+        grid-template-columns: minmax(310px, 420px) minmax(0, 1fr);
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .admin-panel {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .customer-report-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+        gap: 12px;
+      }
+
+      @media (max-width: 1240px) {
+        header,
+        main,
+        .customer-shell,
+        .admin-grid,
+        .customer-report-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-grid,
+        .agent-grid,
+        .sample-grid,
+        .workflow-steps {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .metric-grid,
+        .metric-grid.two,
+        .agent-grid,
+        .checklist-grid,
+        .sample-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>化工合规 RAG 工具 · 合规预审 Case 工作台</h1>
+        <p>围绕 Case 管理客户资料包、资料缺口、预审结论、整改动作和管理端技术证据。</p>
+      </div>
+      <div class="status" id="status">连接本地 API 中...</div>
+    </header>
+
+    <main>
+      <section id="customerWorkbench" data-mode="customer">
+        <div class="panel-head">
+          <div>
+            <h2>客户预审</h2>
+            <span class="tag">Case 流程</span>
+          </div>
+          <div class="mode-switch">
+            <button id="showCustomerWorkbench" class="secondary active">客户预审</button>
+            <button id="showAdminWorkbench" class="secondary">管理端</button>
+          </div>
+        </div>
+        <div class="body">
+          <div class="case-topbar">
+            <div>
+              <strong id="currentCaseTitle">尚未选择 Case</strong>
+              <p id="caseActionHint">按顺序创建 Case、上传资料包、查看资料包预检，再运行预审生成客户报告。</p>
+            </div>
+            <div class="action-strip">
+              <span class="tag" id="caseStatusText">draft</span>
+              <button id="createCase">保存 Case 信息</button>
+              <button id="uploadCaseDocuments" class="secondary">上传并预检</button>
+              <button id="runCaseReview">运行预审</button>
+            </div>
+          </div>
+
+          <div class="workflow-steps">
+            <article class="workflow-step active"><strong>1 创建 Case</strong><span>标题、场景、目标市场</span></article>
+            <article class="workflow-step"><strong>2 上传资料包</strong><span>选择资料包文件</span></article>
+            <article class="workflow-step"><strong>3 资料包预检</strong><span>识别读懂了什么、缺什么</span></article>
+            <article class="workflow-step"><strong>4 审查范围</strong><span>场景推荐检查项，可调整</span></article>
+            <article class="workflow-step"><strong>5 客户报告</strong><span>结论、补件、复核和下一步</span></article>
+          </div>
+
+          <div class="customer-shell">
+            <aside class="case-flow">
+              <section>
+                <div class="panel-head">
+                  <h2>Case 列表</h2>
+                  <div class="actions">
+                    <button id="refreshCases" class="secondary">刷新</button>
+                    <button id="clearCases" class="secondary">清空</button>
+                  </div>
+                </div>
+                <div class="body">
+                  <div class="list" id="caseList"></div>
+                </div>
+              </section>
+
+              <section>
+                <div class="panel-head"><h2>演示 Case 模板</h2></div>
+                <div class="body">
+                  <div class="knowledge-pack-note">
+                    <strong>供应商 A/B/C 仅用于快速载入演示 Case。</strong>
+                    <span>真实客户资料包从右侧上传；手动上传资料会清空演示选择，避免混淆。</span>
+                  </div>
+                  <div class="sample-grid">
+                    <button class="sample-button" data-sample="compliant_water_cleaner">供应商 A：水性清洗剂准入资料包</button>
+                    <button class="sample-button" data-sample="incompatible_oxidizer_flammable">供应商 B：含乙醇/过氧化氢清洗剂资料包</button>
+                    <button class="sample-button" data-sample="unknown_missing_process">供应商 C：研发中间体资料缺口包</button>
+                  </div>
+                </div>
+              </section>
+            </aside>
+
+            <div class="case-flow">
+              <section class="flow-step">
+                <div class="flow-step-header">
+                  <h3>1 创建 Case</h3>
+                  <span class="tag">Case 信息</span>
+                </div>
+                <div class="metric-grid">
+                  <label>
+                    案件标题
+                    <input id="uploadTitle" value="" placeholder="例如：XX 供应商清洗剂准入预审" />
+                  </label>
+                  <label>
+                    审查场景
+                    <select id="reviewScenario">
+                      <option value="market_access">市场准入预审</option>
+                      <option value="substitution">替代物料评估</option>
+                      <option value="supplier_intake">供应商资料准入</option>
+                      <option value="process_introduction">工艺导入风险评估</option>
+                      <option value="storage_safety">储运与现场安全评估</option>
+                    </select>
+                  </label>
+                  <label>
+                    目标市场
+                    <input id="targetMarkets" value="CN,EU,US" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="flow-step">
+                <div class="flow-step-header">
+                  <h3>2 上传资料包</h3>
+                  <span class="tag">多文件主入口</span>
+                </div>
+                <label>
+                  选择资料包
+                  <input id="documentFiles" type="file" accept=".txt,.pdf,text/plain,application/pdf" multiple />
+                </label>
+                <button class="collapse-toggle" data-target="legacyUploadPanel" aria-expanded="false">兼容上传 SDS / 配方表 / 工艺说明</button>
+                <div id="legacyUploadPanel" class="metric-grid collapsible collapsed">
+                  <label>兼容上传 SDS<input id="sdsFile" type="file" accept=".txt,.pdf,text/plain,application/pdf" /></label>
+                  <label>兼容上传配方表<input id="formulaFile" type="file" accept=".txt,.pdf,text/plain,application/pdf" /></label>
+                  <label>兼容上传工艺说明<input id="processFile" type="file" accept=".txt,.pdf,text/plain,application/pdf" /></label>
+                </div>
+                <div class="knowledge-pack-note">
+                  <strong>“上传并预检”只会检查资料包完整性，不会运行正式审查。</strong>
+                  <span>系统不会要求用户严格按三件套命名；它会先说明识别出的文件类型、可读性、缺失资料和本次可审范围。</span>
+                </div>
+              </section>
+
+              <section class="flow-step">
+                <div class="flow-step-header">
+                  <h3>3 资料包预检</h3>
+                  <span class="tag">资料完整性与可审性</span>
+                </div>
+                <div id="packagePrecheck" class="report-card"></div>
+                <div id="documentQuality" class="report-card"></div>
+              </section>
+
+              <section class="flow-step">
+                <div class="flow-step-header">
+                  <h3>4 审查范围</h3>
+                  <span class="tag">推荐检查项</span>
+                </div>
+                <div class="check-option-grid">
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="intake_readiness" checked /> 资料完整性与可审性</span><small>识别资料类型、可读性、缺口和补件</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="ingredient_identity" checked /> 成分识别与 CAS/浓度完整性</span><small>物质名称、CAS、浓度和保密成分</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="restricted_substance" checked /> 禁限用物质与红线物质筛查</span><small>企业红线、SVHC、危化目录和未知物质</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="compatibility_risk" checked /> 物料相容性与危险组合</span><small>氧化剂/可燃物、酸/次氯酸盐等禁忌组合</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="sds_key_sections" checked /> SDS 关键章节核查</span><small>章节、供应商、修订日期、危害和运输信息</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="process_fit" /> 工艺条件适配性</span><small>温度、压力、步骤和导入边界</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="storage_transport" checked /> 储存与运输条件核查</span><small>储存条件、运输信息、隔离和通风要求</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="regulatory_screening" checked /> 目标市场法规匹配</span><small>CN/EU/US 法规与知识库证据</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="supplier_evidence_consistency" /> 供应商声明/检测报告一致性</span><small>供应商声明、检测报告和资料交叉一致性</small></label>
+                  <label class="check-option"><span><input class="check-type" type="checkbox" value="manual_review" /> 人工复核与补件建议</span><small>无法自动放行时生成复核和补件动作</small></label>
+                </div>
+              </section>
+
+              <section class="flow-step">
+                <div class="flow-step-header">
+                  <h3>5 客户报告</h3>
+                  <button class="secondary" id="openAdminEvidence">查看管理端证据</button>
+                </div>
+                <article class="verdict-card" id="verdictCard">
+                  <span>客户结论</span>
+                  <strong id="verdictText">未运行</strong>
+                  <p id="reasonText">先上传并预检资料包，再运行预审。资料缺口较大时，系统只会给出补件或复核建议，不会判定合格。</p>
+                </article>
+                <div class="customer-report-grid">
+                  <div id="customerReport" class="report-card"></div>
+                  <div class="case-flow">
+                    <div id="caseDetail" class="report-card"></div>
+                    <h3>资料清单</h3>
+                    <div id="caseDocuments" class="list"></div>
+                    <h3>建议动作</h3>
+                    <div id="recommendedAction" class="report-card"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="adminWorkbench" data-mode="admin" class="admin-workbench hidden">
+        <div class="panel-head">
+          <div>
+            <h2>管理端</h2>
+            <span class="tag">知识库 / 上传审查 / 技术细节</span>
+          </div>
+          <div class="mode-switch">
+            <button id="adminShowCustomerWorkbench" class="secondary">客户预审</button>
+            <button id="adminShowAdminWorkbench" class="secondary active">管理端</button>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <div class="admin-panel">
+            <section>
+              <div class="panel-head"><h2>知识库工作台</h2></div>
+              <div class="body">
+                <div class="actions">
+                  <button id="uploadKnowledgePack">上传官方知识库源文档</button>
+                  <button id="loadChunks" class="secondary">查看已上传 Chunk</button>
+                  <button id="clearKnowledge" class="danger">清空知识库</button>
+                </div>
+                <div class="knowledge-pack-note">
+                  <strong>主流程：1 上传官方知识库源文档 → 2 上传供应商资料包 → 3 运行审查</strong>
+                  <span>查看知识 Chunk 是审计入口，用来确认上传文档已被切分和向量化；内置评测集已收纳到开发者折叠区，不参与现场上传审查。</span>
+                  <span>若知识库为空，上传审查会被前端阻止，后端也会保守返回复核，不会静默使用内置备用规则。</span>
+                </div>
+                <div class="metric-grid two">
+                  <label>知识库 Manifest<input id="manifestFile" name="manifest_file" type="file" accept=".json,application/json" /></label>
+                  <label>官方源文档<input id="sourceFiles" name="source_files" type="file" accept=".md,.txt,.pdf,text/markdown,text/plain,application/pdf" multiple /></label>
+                </div>
+                <div class="actions">
+                  <button id="clearKnowledgeFiles" class="secondary">清除已选文件</button>
+                </div>
+                <div class="knowledge-pack-note">
+                  <strong>官方知识库源文档位置</strong>
+                  <span>浏览器下载不稳定时，直接在本机解压并选择下面目录中的 manifest 和 5 份源文档。</span>
+                  <code>data_samples/chemical_knowledge_sources/official_pack_2026_05.zip</code>
+                  <code>data_samples/chemical_knowledge_sources/official_pack_2026_05/</code>
+                </div>
+                <div class="metric-grid two">
+                  <div class="metric"><span>知识来源</span><strong id="kbSourceCount">0</strong></div>
+                  <div class="metric"><span>知识 Chunk</span><strong id="kbChunkCount">0</strong></div>
+                  <div class="metric"><span>向量数</span><strong id="kbVectorCount">0</strong></div>
+                  <div class="metric"><span>Embedding</span><strong id="kbEmbedding">-</strong></div>
+                </div>
+                <div class="source-list" id="knowledgeSources"></div>
+                <button class="collapse-toggle" data-target="chunkList" aria-expanded="false">知识 Chunk</button>
+                <div class="list collapsible collapsed" id="chunkList"></div>
+              </div>
+            </section>
+
+            <section>
+              <div class="panel-head"><h2>上传审查兼容入口</h2></div>
+              <div class="body">
+                <label>审查 TopK<input id="uploadTopK" type="number" min="1" max="20" value="6" /></label>
+                <label>
+                  审查任务
+                  <textarea id="reviewTask">请判断该供应商清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。</textarea>
+                  <span>普通用户端不需要填写；该字段仅用于管理端复现、调试和排错。</span>
+                </label>
+                <div class="task-suggestions">
+                  <span class="suggestion-chip">任务推荐，可多选</span>
+                  <span id="reviewTaskPresets" class="task-suggestions"></span>
+                </div>
+                <div class="actions">
+                  <button id="applySelectedReviewTasks" class="secondary">应用推荐任务</button>
+                  <button id="clearSelectedReviewTasks" class="secondary">清空选择</button>
+                  <button id="clearReviewTaskHistory" class="secondary">清空任务历史</button>
+                </div>
+                <div class="list" id="selectedReviewTasks"></div>
+                <button class="collapse-toggle" data-target="reviewTaskHistory" aria-expanded="false">审查任务历史</button>
+                <div class="list collapsible collapsed" id="reviewTaskHistory"></div>
+                <div class="actions">
+                  <button id="runUploadReview" class="secondary">上传并运行审查</button>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div class="panel-head"><h2>向量检索实验</h2></div>
+              <div class="body">
+                <label>
+                  检索 Query
+                  <textarea id="knowledgeQuery">CAS 64-17-5 过氧化氢 氧化剂 可燃液体 禁忌</textarea>
+                </label>
+                <label>
+                  Top K
+                  <input id="topK" type="number" min="1" max="20" value="6" />
+                </label>
+                <div class="actions">
+                  <button id="searchKnowledge" class="secondary">运行检索实验</button>
+                </div>
+                <button class="collapse-toggle" data-target="searchChunks" aria-expanded="true">Rerank 解释</button>
+                <div class="list collapsible" id="searchChunks"></div>
+                <button class="collapse-toggle" data-target="queryHistory" aria-expanded="false">检索历史</button>
+                <div class="list collapsible collapsed" id="queryHistory"></div>
+                <div class="actions">
+                  <button id="clearQueryHistory" class="secondary">清空历史</button>
+                </div>
+                <div class="actions">
+                  <a href="/data_samples/chemical_rag_dataset/upload_samples/incompatible_oxidizer_flammable_sds.txt" download>下载 SDS 资料文件</a>
+                  <a href="/data_samples/chemical_rag_dataset/upload_samples/incompatible_oxidizer_flammable_formula.txt" download>下载配方表资料文件</a>
+                  <a href="/data_samples/chemical_rag_dataset/upload_samples/incompatible_oxidizer_flammable_process.txt" download>下载工艺说明资料文件</a>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="admin-panel">
+            <section>
+              <div class="panel-head">
+                <h2>技术细节</h2>
+                <span class="tag" id="graphEngine">-</span>
+              </div>
+              <div class="body detail-panel">
+                <div class="metric-grid">
+                  <div class="metric"><span>流程节点</span><strong id="nodeCount">0</strong></div>
+                  <div class="metric"><span>RAG 证据</span><strong id="chunkCount">0</strong></div>
+                  <div class="metric"><span>命中规则</span><strong id="ruleCount">0</strong></div>
+                  <div class="metric"><span>交叉质检</span><strong id="crossScore">0</strong></div>
+                </div>
+                <div class="metric-grid">
+                  <div class="metric"><span>检索策略</span><strong id="retrievalStrategy">-</strong></div>
+                  <div class="metric"><span>向量库</span><strong id="vectorStore">-</strong></div>
+                  <div class="metric"><span>Rerank</span><strong id="rerankMode">-</strong></div>
+                  <div class="metric"><span>LLM Agent</span><strong id="llmModel">-</strong></div>
+                </div>
+
+                <button class="collapse-toggle" data-target="technicalDetails" aria-expanded="true">技术细节</button>
+                <div id="technicalDetails" class="collapsible">
+                  <button class="collapse-toggle" data-target="ragPipeline" aria-expanded="true">RAG 链路</button>
+                  <div class="pipeline collapsible" id="ragPipeline"></div>
+                  <button class="collapse-toggle" data-target="multiQueryRecall" aria-expanded="true">多 query RAG 召回</button>
+                  <div class="list collapsible" id="multiQueryRecall"></div>
+                  <button class="collapse-toggle" data-target="rawRecall" aria-expanded="false">TopK 原始召回</button>
+                  <div class="list collapsible collapsed" id="rawRecall"></div>
+                  <button class="collapse-toggle" data-target="rerankedChunks" aria-expanded="false">Rerank 后排序</button>
+                  <div class="list collapsible collapsed" id="rerankedChunks"></div>
+                  <button class="collapse-toggle" data-target="agentResults" aria-expanded="true">Agent 分支分析</button>
+                  <div class="agent-grid collapsible" id="agentResults">
+                    <article class="agent"><strong>物料 Agent</strong><span>待运行</span></article>
+                    <article class="agent"><strong>工艺 Agent</strong><span>待运行</span></article>
+                    <article class="agent"><strong>储运 Agent</strong><span>待运行</span></article>
+                    <article class="agent"><strong>法规 Agent</strong><span>待运行</span></article>
+                  </div>
+                  <button class="collapse-toggle" data-target="graphNodes" aria-expanded="true">流程回放</button>
+                  <article class="pipeline-step">
+                    <strong>流程回放有什么用</strong>
+                    <span>用于解释本次审查从加载任务、解析资料、RAG 检索、Agent 分析到主审判定的执行顺序；点击节点可在下方查看该步骤输入输出。</span>
+                  </article>
+                  <div class="graph collapsible" id="graphNodes"></div>
+                  <div id="selectedNodeDetail" class="report-card"></div>
+                </div>
+
+                <h3>资料完整性与补件判断</h3>
+                <span class="tag">抽取校验已收敛为补件判断</span>
+                <button class="collapse-toggle" data-target="extractedChecklist" aria-expanded="false">字段级清单</button>
+                <div class="checklist-grid collapsible collapsed" id="extractedChecklist"></div>
+                <h3>任务拆解</h3>
+                <div class="list" id="taskDecomposition"></div>
+                <h3>风险项</h3>
+                <div class="list" id="riskItems"></div>
+
+                <button class="collapse-toggle" data-target="sourceDocumentsPanel" aria-expanded="false">原始资料（上传文件原文 / 抽取依据）</button>
+                <div id="sourceDocumentsPanel" class="collapsible collapsed">
+                  <article class="pipeline-step">
+                    <strong>原始资料有什么用</strong>
+                    <span>用于核对系统是否真实读取了 SDS、配方表和工艺说明，并作为字段抽取、资料缺口和风险证据的原文依据。</span>
+                  </article>
+                  <pre class="document-preview" id="sourceDocuments">上传审查后查看 SDS、配方表和工艺资料。</pre>
+                </div>
+
+                <div id="reportSummary" class="report-card"></div>
+                <h3>主审汇总</h3>
+                <div id="chiefSynthesis" class="report-card"></div>
+                <h3>当前风险证据链</h3>
+                <div id="selectedRiskEvidence" class="list"></div>
+                <button class="collapse-toggle" data-target="detail" aria-expanded="false">节点详情</button>
+                <div id="detail" class="collapsible collapsed"></div>
+                <button class="collapse-toggle" data-target="chunks" aria-expanded="true">RAG 检索证据</button>
+                <div id="chunks" class="list collapsible"></div>
+                <button class="collapse-toggle" data-target="rules" aria-expanded="true">命中规则</button>
+                <div id="rules" class="list collapsible"></div>
+                <button class="collapse-toggle" data-target="evidences" aria-expanded="false">证据链列表</button>
+                <div id="evidences" class="list collapsible collapsed"></div>
+                <button class="collapse-toggle" data-target="rawJson" aria-expanded="false">Trace JSON</button>
+                <pre id="rawJson" class="collapsible collapsed">{}</pre>
+              </div>
+            </section>
+
+            <button class="collapse-toggle" data-target="developerEvaluation" aria-expanded="false">开发者质量评测 / 内置评测集</button>
+            <section id="developerEvaluation" class="collapsible collapsed">
+              <div class="panel-head"><h2>开发者质量评测 / 内置评测集</h2></div>
+              <div class="body">
+                <div class="knowledge-pack-note">
+                  <strong>内置评测集用于证明系统回归质量，不参与现场上传审查。</strong>
+                  <span>点击后会调用 /chemical/evaluation，重新跑 12 个内置基准 case，查看三值判定匹配、证据覆盖率和复核召回率。</span>
+                </div>
+                <div class="actions">
+                  <button id="loadEval" class="secondary">运行内置评测集</button>
+                </div>
+                <div class="metric-grid two">
+                  <div class="metric"><span>Case 数</span><strong id="evalCaseCount">0</strong></div>
+                  <div class="metric"><span>三值判定匹配</span><strong id="verdictMatch">0</strong></div>
+                  <div class="metric"><span>证据覆盖率</span><strong id="avgEvidence">0</strong></div>
+                  <div class="metric"><span>复核召回率</span><strong id="reviewRecall">0</strong></div>
+                </div>
+                <div id="evalCases" class="list"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const state = {
+        trace: null,
+        selectedNode: null,
+        selectedDocument: 0,
+        selectedRisk: 0,
+        selectedCaseId: null,
+        selectedCaseTitle: "",
+        selectedCaseStatus: "draft",
+        selectedCaseDocumentCount: 0,
+        packagePrecheck: null,
+        knowledgeLoaded: false,
+        knowledgeBusy: false,
+      };
+      const $ = (id) => document.getElementById(id);
+
+      function setStatus(message) {
+        $("status").textContent = message;
+      }
+
+      function toggleSection(button) {
+        const target = $(button.dataset.target);
+        if (!target) return;
+        const expanded = button.getAttribute("aria-expanded") === "true";
+        button.setAttribute("aria-expanded", String(!expanded));
+        target.classList.toggle("collapsed", expanded);
+      }
+
+      function setWorkbenchMode(mode) {
+        const isAdmin = mode === "admin";
+        $("customerWorkbench").classList.toggle("hidden", isAdmin);
+        $("adminWorkbench").classList.toggle("hidden", !isAdmin);
+        ["showCustomerWorkbench", "adminShowCustomerWorkbench"].forEach((id) => $(id)?.classList.toggle("active", !isAdmin));
+        ["showAdminWorkbench", "adminShowAdminWorkbench"].forEach((id) => $(id)?.classList.toggle("active", isAdmin));
+      }
+
+      function updateCaseActionState() {
+        const hasCase = Boolean(state.selectedCaseId);
+        $("caseStatusText").textContent = caseStatusLabel(state.selectedCaseStatus);
+        $("currentCaseTitle").textContent = hasCase ? state.selectedCaseTitle || state.selectedCaseId : "尚未选择 Case";
+        const hintByStatus = {
+          draft: hasCase ? "Case 信息已保存，请选择资料包并点击“上传并预检”。" : "填写标题、场景和目标市场后保存 Case；打开左侧历史 Case 不会覆盖新建表单。",
+          uploaded: "资料包已上传，可以先核对预检结果，再运行预审。",
+          needs_supplement: "当前结论需要补件，请查看补件清单和受限检查项。",
+          needs_review: "当前结论需要人工复核，请查看复核项和管理端证据。",
+          not_approved: "当前结论为不建议准入，请查看不合格原因和整改建议。",
+          ready_for_next_step: "当前 Case 可进入下一步，请查看客户报告。",
+        };
+        $("caseActionHint").textContent = hintByStatus[state.selectedCaseStatus] || hintByStatus.draft;
+        $("uploadCaseDocuments").disabled = false;
+        $("runCaseReview").disabled = state.knowledgeBusy || !state.knowledgeLoaded;
+        $("runCaseReview").title = state.knowledgeLoaded ? "运行当前 Case 预审" : "请先在管理端上传官方知识库源文档";
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, options);
+        if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
+        return response.json();
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function verdictClass(verdict) {
+        if (verdict === "合规" || verdict === "可进入下一步") return "ok";
+        if (verdict === "不合规" || verdict === "不建议准入") return "bad";
+        return "review";
+      }
+
+      function statusClass(status) {
+        return status === "missing" ? "missing" : "";
+      }
+
+      const CASE_STATUS_LABELS = {
+        draft: "草稿",
+        needs_supplement: "需补件",
+        needs_review: "需复核",
+        not_approved: "不建议准入",
+        ready_for_next_step: "可进入下一步",
+        uploaded: "已上传",
+      };
+
+      function caseStatusLabel(status) {
+        return CASE_STATUS_LABELS[status] || status || "草稿";
+      }
+
+      function customerFieldLabel(value) {
+        const labels = {
+          sds_sections: "SDS 16 章节",
+          supplier: "供应商名称",
+          revision_date: "SDS 修订日期",
+          cas_numbers: "成分 CAS 号",
+          component_concentrations: "成分浓度",
+          process_temperature: "工艺温度",
+          process_pressure: "工艺压力",
+          process_steps: "工艺关键步骤",
+          storage_condition: "储存条件",
+          transport_information: "运输信息",
+          machine_readable_text: "可复制文字版资料",
+        };
+        return labels[value] || String(value || "").replaceAll("_", " ");
+      }
+
+      function renderCustomerFriendlyVerdict(report) {
+        if (!report) return { label: "未运行", reason: "上传并预检资料包后再运行预审。" };
+        const label = report.verdict_label || report.verdict;
+        const reason = report.summary || "";
+        return { label, reason };
+      }
+
+      function currentTopK() {
+        return Number(($("uploadTopK")?.value || $("topK")?.value || 6));
+      }
+
+      const QUERY_HISTORY_KEY = "chemicalRagQueryHistory";
+      const REVIEW_TASK_HISTORY_KEY = "chemicalRagReviewTaskHistory";
+
+      async function loadReviewTaskPresets() {
+        const payload = await api("/chemical/query-presets");
+        $("reviewTaskPresets").innerHTML = payload.presets
+          .map(
+            (preset) =>
+              `<label class="suggestion-chip"><input class="review-task-preset" type="checkbox" value="${escapeHtml(preset.query)}" data-title="${escapeHtml(preset.title)}" data-markets="${escapeHtml((preset.target_markets || []).join(","))}" /> ${escapeHtml(preset.title)}</label>`
+          )
+          .join("");
+        document.querySelectorAll(".review-task-preset").forEach((checkbox) =>
+          checkbox.addEventListener("change", renderSelectedReviewTasks)
+        );
+        renderSelectedReviewTasks();
+      }
+
+      function selectedReviewTaskInputs() {
+        return Array.from(document.querySelectorAll(".review-task-preset:checked"));
+      }
+
+      function renderSelectedReviewTasks() {
+        const selected = selectedReviewTaskInputs();
+        $("selectedReviewTasks").innerHTML = selected.length
+          ? selected
+              .map((item) => `<article class="pipeline-step"><strong>${escapeHtml(item.dataset.title)}</strong><span>${escapeHtml(item.value)}</span></article>`)
+              .join("")
+          : `<article class="pipeline-step"><strong>未选择审查任务</strong><span>可从高频审查任务中多选，或直接编辑上方文本框。</span></article>`;
+      }
+
+      function applySelectedReviewTasks() {
+        const selected = selectedReviewTaskInputs();
+        if (!selected.length) {
+          setStatus("请先选择至少一个高频审查任务。");
+          return;
+        }
+        const tasks = selected.map((item, index) => `${index + 1}. ${item.value}`);
+        $("reviewTask").value = tasks.join("\n");
+        const markets = [...new Set(selected.flatMap((item) => (item.dataset.markets || "").split(",").filter(Boolean)))];
+        if (markets.length) $("targetMarkets").value = markets.join(",");
+        rememberReviewTask($("reviewTask").value);
+        setStatus("已将选中的高频审查任务合并到审查任务文本框。");
+      }
+
+      function selectedCheckTypes() {
+        const selected = Array.from(document.querySelectorAll(".check-type:checked")).map((item) => item.value);
+        return selected.length ? selected : ["intake_readiness", "ingredient_identity", "restricted_substance", "sds_key_sections", "storage_transport", "regulatory_screening"];
+      }
+
+      function selectedTargetMarkets() {
+        const selected = $("targetMarkets").value
+          .split(",")
+          .map((item) => item.trim().toUpperCase())
+          .filter(Boolean);
+        return selected.length ? selected : ["CN", "EU", "US"];
+      }
+
+      const SCENARIO_RECOMMENDED_CHECK_TYPES = {
+        supplier_intake: ["intake_readiness", "ingredient_identity", "restricted_substance", "sds_key_sections", "supplier_evidence_consistency", "manual_review"],
+        substitution: ["intake_readiness", "ingredient_identity", "restricted_substance", "compatibility_risk", "process_fit", "storage_transport", "manual_review"],
+        market_access: ["intake_readiness", "ingredient_identity", "restricted_substance", "sds_key_sections", "process_fit", "storage_transport", "regulatory_screening"],
+        process_introduction: ["intake_readiness", "ingredient_identity", "compatibility_risk", "process_fit", "storage_transport", "manual_review"],
+        storage_safety: ["intake_readiness", "ingredient_identity", "compatibility_risk", "storage_transport", "sds_key_sections", "manual_review"],
+      };
+
+      function applyScenarioRecommendedChecks() {
+        const recommended = new Set(SCENARIO_RECOMMENDED_CHECK_TYPES[$("reviewScenario").value] || SCENARIO_RECOMMENDED_CHECK_TYPES.market_access);
+        document.querySelectorAll(".check-type").forEach((checkbox) => {
+          checkbox.checked = recommended.has(checkbox.value);
+        });
+      }
+
+      function setPackageFiles(files) {
+        const transfer = new DataTransfer();
+        files.forEach((file) => transfer.items.add(file));
+        $("documentFiles").files = transfer.files;
+      }
+
+      function clearDemoPackageSelection() {
+        document.querySelectorAll(".sample-button").forEach((button) => button.classList.remove("active"));
+      }
+
+      function clearCustomerPackageSelection() {
+        const transfer = new DataTransfer();
+        $("documentFiles").files = transfer.files;
+        ["sdsFile", "formulaFile", "processFile"].forEach((id) => {
+          $(id).value = "";
+        });
+      }
+
+      function clearSelectedReviewTasks() {
+        document.querySelectorAll(".review-task-preset").forEach((item) => (item.checked = false));
+        renderSelectedReviewTasks();
+        setStatus("已清空高频审查任务选择。");
+      }
+
+      function readReviewTaskHistory() {
+        try {
+          return JSON.parse(localStorage.getItem(REVIEW_TASK_HISTORY_KEY) || "[]");
+        } catch {
+          return [];
+        }
+      }
+
+      function rememberReviewTask(task) {
+        const value = String(task || "").trim();
+        if (!value) return;
+        const history = [value, ...readReviewTaskHistory().filter((item) => item !== value)].slice(0, 10);
+        localStorage.setItem(REVIEW_TASK_HISTORY_KEY, JSON.stringify(history));
+        renderReviewTaskHistory();
+      }
+
+      function renderReviewTaskHistory() {
+        const history = readReviewTaskHistory();
+        $("reviewTaskHistory").innerHTML = history.length
+          ? history
+              .map((task) => `<article class="chunk"><button class="secondary review-task-history-item" data-task="${escapeHtml(task)}">${escapeHtml(task)}</button></article>`)
+              .join("")
+          : `<article class="chunk"><strong>审查任务历史</strong><span>运行审查或应用高频任务后保留最近 10 条，可一键复用。</span></article>`;
+        document.querySelectorAll(".review-task-history-item").forEach((button) =>
+          button.addEventListener("click", () => {
+            $("reviewTask").value = button.dataset.task || "";
+            setStatus("已从审查任务历史填入任务。");
+          })
+        );
+      }
+
+      function clearReviewTaskHistory() {
+        localStorage.removeItem(REVIEW_TASK_HISTORY_KEY);
+        renderReviewTaskHistory();
+        setStatus("审查任务历史已清空");
+      }
+
+      async function loadCaseList() {
+        const payload = await api("/chemical/cases");
+        const cases = payload.cases || [];
+        $("caseList").innerHTML = cases.length
+          ? cases
+              .map(
+                (item) => `
+                  <article class="case-row ${item.id === state.selectedCaseId ? "active" : ""}">
+                    <button class="secondary case-select" data-case-id="${escapeHtml(item.id)}">
+                      ${escapeHtml(item.title)}
+                    </button>
+                    <span>${escapeHtml(caseStatusLabel(item.status))} · 资料 ${item.document_count || 0} · ${escapeHtml((item.target_markets || []).join(","))}</span>
+                    <span>${escapeHtml(item.latest_verdict || "未运行")}</span>
+                  </article>
+                `
+              )
+              .join("")
+          : `<article class="case-row"><strong>暂无 Case</strong><span>先填写 Case 信息；选择资料包后点击“上传并预检”，再运行预审。</span></article>`;
+        document.querySelectorAll(".case-select").forEach((button) =>
+          button.addEventListener("click", () => loadCaseDetail(button.dataset.caseId))
+        );
+        updateCaseActionState();
+      }
+
+      async function clearCases() {
+        const payload = await api("/chemical/cases", { method: "DELETE" });
+        state.selectedCaseId = null;
+        state.selectedCaseTitle = "";
+        state.selectedCaseStatus = "draft";
+        state.selectedCaseDocumentCount = 0;
+        state.packagePrecheck = null;
+        state.trace = null;
+        $("currentCaseTitle").textContent = "尚未选择 Case";
+        $("caseDetail").innerHTML = "<p>请选择或创建一个 Case。</p>";
+        $("caseDocuments").innerHTML = "";
+        $("customerReport").innerHTML = "<p>运行预审后生成客户报告；资料不足时只输出补件或复核建议。</p>";
+        $("documentQuality").innerHTML = "<p>上传并预检后显示资料完整性、阻断性缺口和补件动作。</p>";
+        renderPackagePrecheck(null);
+        await loadCaseList();
+        updateCaseActionState();
+        setStatus(`已清空 Case 列表：删除 ${payload.deleted_cases} 个 Case。`);
+      }
+
+      async function loadCaseDetail(caseId) {
+        if (!caseId) return;
+        const payload = await api(`/chemical/cases/${caseId}`);
+        state.selectedCaseId = caseId;
+        renderCaseDetail(payload);
+        await loadCaseList();
+        setStatus(`已打开 Case：${payload.case.title}`);
+        updateCaseActionState();
+      }
+
+      function fillCaseFormFromCase(item) {
+        const formTitle = $("uploadTitle");
+        const formMarkets = $("targetMarkets");
+        formTitle.value = item.title || "";
+        formMarkets.value = (item.target_markets || selectedTargetMarkets()).join(",");
+        if (item.review_scenario) $("reviewScenario").value = item.review_scenario;
+        if (item.check_types?.length) {
+          const selected = new Set(item.check_types);
+          document.querySelectorAll(".check-type").forEach((checkbox) => {
+            checkbox.checked = selected.has(checkbox.value);
+          });
+        }
+      }
+
+      function renderCaseDetail(payload) {
+        const item = payload.case;
+        state.selectedCaseId = item.id;
+        state.selectedCaseTitle = item.title || item.id;
+        state.selectedCaseStatus = item.status || "draft";
+        state.selectedCaseDocumentCount = payload.document_count || (payload.documents || []).length || 0;
+        state.packagePrecheck = payload.package_precheck || payload.latest_report?.package_precheck || null;
+        // 保持新建表单不被历史 Case 自动覆盖；用户如需复用历史 Case，可通过左侧 Case 详情确认。
+        $("currentCaseTitle").textContent = item.title || item.id;
+        renderPackagePrecheck(payload.package_precheck || payload.latest_report?.package_precheck);
+        $("caseDetail").innerHTML = `
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(caseStatusLabel(item.status))} · ${escapeHtml((item.target_markets || []).join(","))} · ${escapeHtml(item.review_scenario)}</span>
+          <span>检查项：${escapeHtml((item.check_types || []).join(", "))}</span>
+          <span>Case ID：${escapeHtml(item.id)}</span>
+        `;
+        $("caseDocuments").innerHTML = (payload.documents || []).length
+          ? payload.documents
+              .map(
+                (document) => `
+                  <article class="source-row">
+                    <strong>${escapeHtml(document.document_type)} · ${escapeHtml(document.filename)}</strong>
+                    <span>${escapeHtml(document.parse_status)} · ${escapeHtml(document.text_source)} · ${document.needs_manual_review ? "需确认" : "已解析"}</span>
+                    <span>${escapeHtml((document.missing_fields || []).join("、") || "无字段缺口")}</span>
+                  </article>
+                `
+              )
+              .join("")
+          : `<article class="source-row"><strong>尚未上传资料</strong><span>选择资料包并点击“上传并预检”后显示 SDS、配方、工艺等文件。</span></article>`;
+        if (payload.latest_report) {
+          renderTrace(payload.latest_report);
+        } else {
+          $("customerReport").innerHTML = "<p>该 Case 尚未运行预审。</p>";
+          if (!payload.package_precheck) renderPackagePrecheck(null);
+          $("documentQuality").innerHTML = "<p>上传并预检后显示资料完整性、阻断性缺口和补件动作。</p>";
+        }
+        updateCaseActionState();
+      }
+
+      async function createCase() {
+        const payload = {
+          title: $("uploadTitle").value.trim() || "未命名预审 Case",
+          review_scenario: $("reviewScenario").value,
+          target_markets: selectedTargetMarkets(),
+          check_types: selectedCheckTypes(),
+        };
+        setStatus("正在创建草稿 Case...");
+        const created = await api("/chemical/cases", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        state.selectedCaseId = created.id;
+        state.selectedCaseTitle = created.title;
+        state.selectedCaseStatus = created.status || "draft";
+        state.selectedCaseDocumentCount = 0;
+        $("currentCaseTitle").textContent = created.title;
+        await loadCaseDetail(created.id);
+        setStatus(`草稿 Case 已创建：${created.title}`);
+      }
+
+      async function ensureCaseReadyForReview() {
+        if (!state.selectedCaseId) {
+          await createCase();
+        }
+        if (selectedDocumentFiles().length && state.selectedCaseDocumentCount === 0) {
+          await uploadCaseDocuments();
+        }
+        return Boolean(state.selectedCaseId && state.selectedCaseDocumentCount > 0);
+      }
+
+      function selectedDocumentFiles() {
+        const packageFiles = Array.from($("documentFiles").files || []);
+        if (packageFiles.length) return packageFiles;
+        return ["sdsFile", "formulaFile", "processFile"].map((id) => $(id).files[0]).filter(Boolean);
+      }
+
+      async function uploadCaseDocuments() {
+        if (!state.selectedCaseId) {
+          await createCase();
+        }
+        const files = selectedDocumentFiles();
+        if (!files.length) {
+          setStatus("请先选择客户资料包文件。");
+          return;
+        }
+        setStatus("正在上传资料包并执行资料包预检...");
+        const form = new FormData();
+        files.forEach((file) => form.append("documents", file));
+        const caseId = state.selectedCaseId;
+        const payload = await api(`/chemical/cases/${caseId}/documents`, { method: "POST", body: form });
+        state.packagePrecheck = payload.package_precheck;
+        state.selectedCaseDocumentCount = payload.document_count || files.length;
+        state.selectedCaseStatus = "uploaded";
+        $("caseStatusText").textContent = "已上传";
+        renderPackagePrecheck(payload.package_precheck);
+        $("caseDocuments").innerHTML = (payload.documents || [])
+          .map(
+            (document) => `
+              <article class="source-row">
+                <strong>${escapeHtml(document.document_type)} · ${escapeHtml(document.filename)}</strong>
+                <span>${escapeHtml(document.parse_status)} · ${escapeHtml(document.text_source)} · ${document.needs_manual_review ? "需确认" : "已解析"}</span>
+                <span>${escapeHtml((document.missing_fields || []).join("、") || "无字段缺口")}</span>
+              </article>
+            `
+          )
+          .join("");
+        await loadCaseList();
+        updateCaseActionState();
+        setStatus("资料包预检完成，请核对可审范围和补件动作。");
+      }
+
+      async function runCaseReview() {
+        if (!state.knowledgeLoaded) {
+          setStatus("知识库未加载，已阻止运行预审。请先在管理端上传官方知识库源文档。");
+          return;
+        }
+        const ready = await ensureCaseReadyForReview();
+        if (!ready) {
+          setStatus("请先选择资料包；演示模板载入后也会在运行预审前自动上传到 Case。");
+          return;
+        }
+        setStatus("正在基于当前 Case 运行预审...");
+        const form = new FormData();
+        form.append("top_k", String(currentTopK()));
+        form.append("review_task", $("reviewTask").value);
+        const caseId = state.selectedCaseId;
+        const trace = await api(`/chemical/cases/${caseId}/run-review`, { method: "POST", body: form });
+        rememberReviewTask($("reviewTask").value);
+        renderTrace(trace);
+        await loadCaseList();
+        await loadCaseDetail(caseId);
+        setStatus(`Case 预审完成：${trace.run_id}`);
+      }
+
+      function readQueryHistory() {
+        try {
+          return JSON.parse(localStorage.getItem(QUERY_HISTORY_KEY) || "[]");
+        } catch {
+          return [];
+        }
+      }
+
+      function rememberQuery(query) {
+        if (!query) return;
+        const history = [query, ...readQueryHistory().filter((item) => item !== query)].slice(0, 10);
+        localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(history));
+        renderQueryHistory();
+      }
+
+      function renderQueryHistory() {
+        const history = readQueryHistory();
+        $("queryHistory").innerHTML = history.length
+          ? history
+              .map((query) => `<article class="chunk"><button class="secondary history-query" data-query="${escapeHtml(query)}">${escapeHtml(query)}</button></article>`)
+              .join("")
+          : `<article class="chunk"><strong>查询历史</strong><span>运行检索后保留最近 10 条，可一键复用。</span></article>`;
+        document.querySelectorAll(".history-query").forEach((button) =>
+          button.addEventListener("click", () => {
+            $("knowledgeQuery").value = button.dataset.query || "";
+            setStatus("已从查询历史填入问题。");
+          })
+        );
+      }
+
+      function clearQueryHistory() {
+        localStorage.removeItem(QUERY_HISTORY_KEY);
+        renderQueryHistory();
+        setStatus("查询历史已清空");
+      }
+
+      async function refreshKnowledgeStatus() {
+        const payload = await api("/chemical/knowledge/status");
+        renderKnowledgeStatus(payload);
+        setKnowledgeLoadedState(payload);
+        return payload;
+      }
+
+      function setKnowledgeLoadedState(payload) {
+        state.knowledgeLoaded = Number(payload.knowledge_base?.chunk_count || 0) > 0 && Number(payload.vector_store?.vector_count || 0) > 0;
+        $("runUploadReview").disabled = state.knowledgeBusy || !state.knowledgeLoaded;
+        $("runUploadReview").title = state.knowledgeLoaded ? "使用已上传知识库运行审查" : "请先上传官方知识库源文档";
+        updateCaseActionState();
+      }
+
+      function setKnowledgeBusyState(busy) {
+        state.knowledgeBusy = busy;
+        $("uploadKnowledgePack").disabled = busy;
+        $("loadChunks").disabled = busy;
+        $("clearKnowledge").disabled = busy;
+        $("searchKnowledge").disabled = busy;
+        $("runCaseReview").disabled = busy || !state.knowledgeLoaded;
+        $("runUploadReview").disabled = busy || !state.knowledgeLoaded;
+        updateCaseActionState();
+      }
+
+      function clearKnowledgeFileInputs() {
+        $("manifestFile").value = "";
+        $("sourceFiles").value = "";
+        setStatus("已清除知识库 manifest 和源文档选择。");
+      }
+
+      async function uploadKnowledgePack() {
+        if (state.knowledgeBusy) return;
+        const manifest = $("manifestFile").files[0];
+        const sourceFiles = Array.from($("sourceFiles").files || []);
+        if (!manifest || !sourceFiles.length) {
+          setStatus("请先选择 manifest_file 和至少一份 source_files 源文档。");
+          return;
+        }
+        setStatus("正在上传官方知识库源文档、切分 Chunk 并写入向量库...");
+        setKnowledgeBusyState(true);
+        $("chunkList").innerHTML = `<article class="chunk"><strong>正在切分并写入向量库</strong><span>上传完成前已暂时禁用查看 Chunk、清空知识库和上传审查，避免展示旧数据或半成品状态。</span></article>`;
+        try {
+          const form = new FormData();
+          form.append("manifest_file", manifest);
+          sourceFiles.forEach((file) => form.append("source_files", file));
+          const payload = await api("/chemical/knowledge/upload-pack", { method: "POST", body: form });
+          renderImportResult(payload);
+          await refreshKnowledgeStatus();
+          await loadChunks();
+          setStatus(`官方知识库已入库：${payload.source_count} sources / ${payload.chunk_count} chunks / ${payload.vector_count} vectors`);
+        } finally {
+          setKnowledgeBusyState(false);
+        }
+      }
+
+      async function clearKnowledge() {
+        setStatus("正在清空已上传知识库...");
+        const payload = await api("/chemical/knowledge", { method: "DELETE" });
+        await refreshKnowledgeStatus();
+        $("chunkList").innerHTML = renderEmptyKnowledgeChunks();
+        setStatus(`知识库已清空：删除 ${payload.deleted_sources} sources / ${payload.deleted_chunks} chunks`);
+      }
+
+      async function loadChunks() {
+        const payload = await api("/chemical/knowledge/chunks");
+        $("chunkList").innerHTML = payload.chunks.length ? payload.chunks.map(renderKnowledgeChunk).join("") : renderEmptyKnowledgeChunks();
+        setStatus(`知识 Chunk 已加载：${payload.chunk_count} chunks / ${payload.vector_count} vectors`);
+        return payload;
+      }
+
+      async function searchKnowledge() {
+        setStatus("正在执行向量检索实验...");
+        const query = $("knowledgeQuery").value.trim();
+        const payload = await api("/chemical/knowledge/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, target_markets: ["CN", "EU", "US"], top_k: currentTopK() }),
+        });
+        renderRetrieval(payload.retrieval, payload.query);
+        $("searchChunks").innerHTML = payload.retrieval.chunks.length
+          ? payload.retrieval.chunks.map((chunk) => renderChunk(chunk, "knowledge search")).join("")
+          : `<article class="chunk"><strong>知识库为空，检索实验不会返回固定内置结果</strong><span>请先上传官方知识库源文档，再运行向量检索和 Rerank 实验。</span></article>`;
+        $("rawJson").textContent = JSON.stringify(payload, null, 2);
+        rememberQuery(query);
+        setStatus(payload.requires_knowledge_upload ? "知识库为空：检索实验未返回结果" : "向量检索实验完成");
+      }
+
+      async function loadSample(sampleId) {
+        clearCustomerPackageSelection();
+        const base = `/data_samples/chemical_rag_dataset/upload_samples/${sampleId}`;
+        const [sds, formula, process] = await Promise.all([
+          fetch(`${base}_sds.txt`).then((r) => r.blob()),
+          fetch(`${base}_formula.txt`).then((r) => r.blob()),
+          fetch(`${base}_process.txt`).then((r) => r.blob()),
+        ]);
+        setFile("sdsFile", sds, `${sampleId}_sds.txt`);
+        setFile("formulaFile", formula, `${sampleId}_formula.txt`);
+        setFile("processFile", process, `${sampleId}_process.txt`);
+        setPackageFiles([
+          new File([sds], `${sampleId}_sds.txt`, { type: "text/plain" }),
+          new File([formula], `${sampleId}_formula.txt`, { type: "text/plain" }),
+          new File([process], `${sampleId}_process.txt`, { type: "text/plain" }),
+        ]);
+        const titles = {
+          compliant_water_cleaner: "供应商 A 资料包准入预审",
+          incompatible_oxidizer_flammable: "供应商 B 资料包准入预审",
+          unknown_missing_process: "供应商 C 资料包准入预审",
+        };
+        const tasks = {
+          compliant_water_cleaner: "请判断该供应商水性清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。",
+          incompatible_oxidizer_flammable: "请判断该供应商含乙醇/过氧化氢清洗剂是否可用于电子零部件清洗工艺，并进入 CN/EU 市场。",
+          unknown_missing_process: "请判断该研发中间体资料包是否满足供应商准入预审要求，缺失信息是否需要人工复核。",
+        };
+        $("uploadTitle").value = titles[sampleId] || `供应商资料包预审：${sampleId}`;
+        $("reviewTask").value = tasks[sampleId] || "请基于上传资料执行化工物料准入风险预审。";
+        clearDemoPackageSelection();
+        document.querySelector(`.sample-button[data-sample="${sampleId}"]`)?.classList.add("active");
+        state.selectedCaseId = null;
+        state.selectedCaseTitle = "";
+        state.selectedCaseTitle = "";
+        state.selectedCaseStatus = "draft";
+        state.selectedCaseDocumentCount = 0;
+        renderPackagePrecheck(null);
+        updateCaseActionState();
+        setStatus(`已载入演示资料包：${sampleId}`);
+      }
+
+      function setFile(inputId, blob, filename) {
+        const file = new File([blob], filename, { type: "text/plain" });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        $(inputId).files = transfer.files;
+      }
+
+      async function runUploadReview() {
+        if (!state.knowledgeLoaded) {
+          setStatus("知识库未加载，已阻止上传审查。请先上传官方知识库源文档。");
+          return;
+        }
+        const packageFiles = Array.from($("documentFiles").files || []);
+        const legacyFiles = ["sdsFile", "formulaFile", "processFile"].map((id) => $(id).files[0]).filter(Boolean);
+        if (!packageFiles.length && legacyFiles.length !== 3) {
+          setStatus("请先上传一个或多个资料文件，或从供应商资料包一键载入。");
+          return;
+        }
+        setStatus("正在按推荐检查项运行资料预检、RAG、规则和多 Agent 审查...");
+        const form = new FormData();
+        form.append("title", $("uploadTitle").value);
+        form.append("review_scenario", $("reviewScenario").value);
+        form.append("check_types", selectedCheckTypes().join(","));
+        form.append("review_task", $("reviewTask").value);
+        form.append("target_markets", $("targetMarkets").value);
+        form.append("top_k", String(currentTopK()));
+        if (packageFiles.length) {
+          packageFiles.forEach((file) => form.append("documents", file));
+        } else {
+          form.append("sds_file", $("sdsFile").files[0]);
+          form.append("formula_file", $("formulaFile").files[0]);
+          form.append("process_file", $("processFile").files[0]);
+        }
+        const trace = await api("/chemical/upload-review", { method: "POST", body: form });
+        rememberReviewTask($("reviewTask").value);
+        renderTrace(trace);
+        state.selectedCaseId = trace.case_id;
+        await loadCaseList();
+        await loadCaseDetail(trace.case_id);
+        setStatus(`上传审查完成：${trace.run_id}`);
+      }
+
+      async function loadEvaluation() {
+        const payload = await api("/chemical/evaluation");
+        $("evalCaseCount").textContent = payload.case_count;
+        $("verdictMatch").textContent = payload.metrics.verdict_match_rate;
+        $("avgEvidence").textContent = payload.metrics.evidence_coverage;
+        $("reviewRecall").textContent = payload.metrics.review_recall;
+        $("evalCases").innerHTML = payload.cases
+          .map(
+            (item) =>
+              `<article class="case-row"><strong>${escapeHtml(item.title || item.case_id)}</strong><span>${item.case_id} · 基准对齐 ${item.verdict_matched} · 实际 ${item.actual_verdict} · 交叉质检 ${item.cross_check_score}</span></article>`
+          )
+          .join("");
+        setStatus("评测看板已刷新");
+      }
+
+      function renderKnowledgeStatus(payload) {
+        $("kbSourceCount").textContent = payload.knowledge_base.source_count;
+        $("kbChunkCount").textContent = payload.knowledge_base.chunk_count;
+        $("kbVectorCount").textContent = payload.vector_store.vector_count;
+        $("kbEmbedding").textContent = `${payload.embedding.provider} / ${payload.embedding.model}`;
+        $("knowledgeSources").innerHTML = payload.sources.length
+          ? payload.sources
+              .map(
+                (source) => `
+                  <article class="source-row">
+                    <strong>${escapeHtml(source.title)}</strong>
+                    <span>${source.jurisdiction} · ${source.source_type} · ${source.source_origin || "unknown"} · ${source.quality_tier || "unspecified"} · ${source.version} · chunks ${source.chunk_count}</span>
+                    <span>${source.effective_date || "-"} · retrieved ${source.retrieved_at || "-"}</span>
+                    <code>${escapeHtml(source.source_url)}</code>
+                  </article>
+                `
+              )
+              .join("")
+          : `<article class="source-row"><strong>未加载官方知识库</strong><span>上传审查会保守进入复核；请先上传 manifest_file 和 source_files。</span><code>POST /chemical/knowledge/upload-pack</code></article>`;
+      }
+
+      function renderEmptyKnowledgeChunks() {
+        return `<article class="chunk"><strong>没有已上传的知识 Chunk</strong><span>当前客户知识库为 0 个知识来源、0 个 Chunk、0 个向量。这里不会展示内置开发备用规则；选择 manifest_file 和 source_files 后点击“上传官方知识库源文档”。</span></article>`;
+      }
+
+      function renderImportResult(payload) {
+        $("knowledgeSources").innerHTML = payload.sources
+          .map(
+            (source) => `
+              <article class="source-row">
+                <strong>${escapeHtml(source.title)}</strong>
+                <span>${source.jurisdiction} · ${source.source_type} · ${source.source_origin || "unknown"} · ${source.quality_tier || "unspecified"} · ${source.version} · chunks ${source.chunk_count}</span>
+                <span>${source.effective_date || "-"} · retrieved ${source.retrieved_at || "-"}</span>
+                <code>${escapeHtml(source.source_url)}</code>
+              </article>
+            `
+          )
+          .join("");
+      }
+
+      function renderKnowledgeChunk(chunk) {
+        return `<article class="chunk">
+          <strong>${escapeHtml(chunk.source_title)} · ${chunk.jurisdiction} · ${chunk.vector_status}</strong>
+          <code>${escapeHtml(chunk.content)}</code>
+          <span>${chunk.source_origin} · ${chunk.quality_tier} · ${chunk.document_role} · retrieved ${chunk.retrieved_at}</span>
+          <span>${chunk.version} · ${chunk.effective_date} · ${escapeHtml(chunk.source_url)}</span>
+          <span>tokens: ${escapeHtml((chunk.tokens || []).slice(0, 18).join(", "))}</span>
+        </article>`;
+      }
+
+      function renderRetrieval(retrieval, query) {
+        $("retrievalStrategy").textContent = retrieval.strategy;
+        $("vectorStore").textContent = `${retrieval.vector_store.type} / ${retrieval.vector_store.vector_count}`;
+        $("rerankMode").textContent = retrieval.rerank.mode;
+        const queryCount = retrieval.queries?.length || 1;
+        $("ragPipeline").innerHTML = [
+          ["Review Query", query],
+          ["Task Decomposition", `${queryCount} agent queries`],
+          ["Vector Search", `${retrieval.embedding.provider} · ${retrieval.embedding.model}`],
+          ["Keyword Match", "CAS / 法域 / 领域关键词"],
+          ["Rerank", retrieval.rerank.features.join(" + ")],
+        ]
+          .map((item, index) => `<article class="pipeline-step"><strong>${index + 1}. ${item[0]}</strong><span>${escapeHtml(item[1])}</span></article>`)
+          .join("");
+        $("multiQueryRecall").innerHTML = renderMultiQueryRecall(retrieval);
+        $("rawRecall").innerHTML = retrieval.chunks.map((chunk) => renderChunk(chunk, "vector/keyword")).join("");
+        $("rerankedChunks").innerHTML = retrieval.chunks.map((chunk) => renderChunk(chunk, "rerank")).join("");
+        $("chunks").innerHTML = retrieval.chunks.map((chunk) => renderChunk(chunk, "evidence")).join("");
+      }
+
+      function renderMultiQueryRecall(retrieval) {
+        const byQuery = retrieval.by_query || {};
+        if (!Object.keys(byQuery).length) {
+          return `<article class="chunk"><strong>多 query RAG 召回</strong><span>当前响应未返回分支 query。</span></article>`;
+        }
+        return Object.entries(byQuery)
+          .map(([agent, item]) => {
+            const top = (item.chunks || []).slice(0, 3).map((chunk) => `#${chunk.rank} ${chunk.jurisdiction} ${chunk.source_type} ${chunk.rerank_score}`).join("；");
+            return `<article class="chunk">
+              <strong>${escapeHtml(agent)} query</strong>
+              <code>${escapeHtml(item.query)}</code>
+              <span>${escapeHtml(top || "未召回")}</span>
+            </article>`;
+          })
+          .join("");
+      }
+
+      function renderChunk(chunk, mode) {
+        return `<article class="chunk">
+          <strong>#${chunk.rank} ${chunk.jurisdiction} ${chunk.source_type} · ${mode} ${chunk.rerank_score}</strong>
+          <code>${escapeHtml(chunk.content)}</code>
+          <span>vector ${chunk.vector_score} · keyword ${chunk.keyword_score} · rerank ${chunk.rerank_score}</span>
+          <span>${escapeHtml((chunk.rerank_reasons || []).join("; "))}</span>
+          <span>${chunk.version} · ${chunk.effective_date} · ${escapeHtml(chunk.source_url)}</span>
+        </article>`;
+      }
+
+      function renderReviewWorkbench(trace) {
+        const workbench = trace.review_workbench;
+        if (!workbench) return;
+        renderPackagePrecheck(trace.package_precheck || workbench.package_precheck);
+        renderSourceDocuments(workbench.source_documents || []);
+        renderTaskDecomposition(workbench.task_decomposition || trace.task_decomposition || []);
+        renderDocumentQuality(workbench.document_quality, workbench.supplement_actions || []);
+        renderCustomerReport(trace.customer_report || workbench.customer_report);
+        $("extractedChecklist").innerHTML = workbench.extracted_checklist
+          .map(
+            (item) => `
+              <article class="check-item ${statusClass(item.status)}">
+                <strong>${escapeHtml(item.label)}</strong>
+                <span>${escapeHtml(item.source)} · ${item.status === "missing" ? "缺失/需确认" : "已抽取"}</span>
+                <p>${escapeHtml(item.value)}</p>
+              </article>
+            `
+          )
+          .join("");
+        $("riskItems").innerHTML = workbench.risk_items
+          .map(
+            (item, index) => `
+              <article class="risk-item ${item.severity} ${index === state.selectedRisk ? "active" : ""}" onclick="selectRisk(${index})">
+                <strong>${item.verdict} · ${escapeHtml((item.rule_refs || []).join(", ") || "资料审查")}</strong>
+                <span>${item.severity} · ${item.requires_human_review ? "需人工复核" : "硬性拦截 / 可进入后续确认"}</span>
+                <p>${escapeHtml(item.reason)}</p>
+              </article>
+            `
+          )
+          .join("");
+        renderReportSummary(workbench.report_summary);
+        renderChiefSynthesis(trace.chief_synthesis || workbench.chief_review_summary);
+        renderSelectedRisk();
+      }
+
+      function renderPackagePrecheck(precheck) {
+        const target = $("packagePrecheck");
+        if (!target) return;
+        if (!precheck) {
+          target.innerHTML = "<p>上传资料包后先显示系统识别到的文件类型、缺口、可审范围和补件动作。</p>";
+          return;
+        }
+        const documents = precheck.documents || [];
+        const available = precheck.available_checks || [];
+        const limited = precheck.limited_checks || [];
+        const blocked = precheck.blocked_checks || [];
+        target.innerHTML = `
+          <strong>${escapeHtml(renderPrecheckStatus(precheck.overall_status))} · 资料包预检结果</strong>
+          <p>${escapeHtml(precheck.user_message || "")}</p>
+          <div class="metric-grid two">
+            <div class="metric"><span>已识别资料</span><strong>${(precheck.recognized_documents || []).length}</strong></div>
+            <div class="metric"><span>需补件</span><strong>${(precheck.supplement_actions || []).length}</strong></div>
+            <div class="metric"><span>可直接检查</span><strong>${available.length}</strong></div>
+            <div class="metric"><span>受限/阻断</span><strong>${limited.length + blocked.length}</strong></div>
+          </div>
+          <div><span>文件识别</span><ul>${
+            documents.length
+              ? documents.map((item) => `<li>${escapeHtml(item.filename)}：${escapeHtml(item.detected_type_label || item.detected_type)} · ${escapeHtml(renderReadability(item.readability))} · ${escapeHtml(renderConfidence(item.confidence))}；${escapeHtml(item.user_message || "")}</li>`).join("")
+              : "<li>尚未上传资料。</li>"
+          }</ul></div>
+          <div><span>可审范围</span><ul>${
+            [...available, ...limited, ...blocked].length
+              ? [
+                  ...available.map((item) => `<li>可审：${escapeHtml(item.label)} · ${escapeHtml(item.reason || "")}</li>`),
+                  ...limited.map((item) => `<li>受限：${escapeHtml(item.label)} · ${escapeHtml(item.reason || "")}</li>`),
+                  ...blocked.map((item) => `<li>暂不能审：${escapeHtml(item.label)} · ${escapeHtml(item.reason || "")}</li>`),
+                ].join("")
+              : "<li>未选择检查项。</li>"
+          }</ul></div>
+          <div><span>补件动作</span><ul>${
+            (precheck.supplement_actions || []).length
+              ? precheck.supplement_actions.map((item) => `<li>${escapeHtml(customerFieldLabel(item.action))}：${escapeHtml(item.reason)}</li>`).join("")
+              : "<li>当前没有资料包级补件动作。</li>"
+          }</ul></div>
+        `;
+      }
+
+      function renderPrecheckStatus(status) {
+        return {
+          ready: "资料基本齐全",
+          partial: "可初筛但需复核",
+          needs_supplement: "需补充资料",
+          unreadable: "文件不可读",
+        }[status] || status || "未预检";
+      }
+
+      function renderReadability(value) {
+        return { readable: "可读取", partially_readable: "部分可读取", unreadable: "不可读取" }[value] || value;
+      }
+
+      function renderConfidence(value) {
+        return { high: "识别置信度高", medium: "识别置信度中", low: "识别置信度低" }[value] || value;
+      }
+
+      function renderCustomerReport(report) {
+        if (!report) {
+          $("customerReport").innerHTML = "<p>运行预审后生成客户报告；资料不足时只输出补件或复核建议。</p>";
+          return;
+        }
+        const groups = report.issue_groups || [];
+        const friendly = renderCustomerFriendlyVerdict(report);
+        $("customerReport").innerHTML = `
+          <strong>${escapeHtml(friendly.label)} · 客户报告</strong>
+          <p>${escapeHtml(friendly.reason)}</p>
+          ${
+            report.review_scope
+              ? `<div><span>审查范围</span><p>${escapeHtml(report.review_scope.message || "")}</p></div>`
+              : ""
+          }
+          <div><span>本次检查项</span><p>${(report.selected_checks || []).map((item) => escapeHtml(item.label)).join("、")}</p></div>
+          ${
+            groups.length
+              ? groups
+                  .map(
+                    (group) => `
+                      <article class="pipeline-step">
+                        <strong>${escapeHtml(group.label)}</strong>
+                        ${(group.items || [])
+                          .map(
+                            (item) => `
+                              <div class="risk-item ${item.status === "not_approved" ? "high" : "review"}">
+                                <strong>${escapeHtml(item.id)} · ${escapeHtml(item.reason)}</strong>
+                                <p>${escapeHtml(item.impact)}</p>
+                                <span>依据：${escapeHtml(item.rule_text)}</span>
+                                <span>资料原文/识别结果：${escapeHtml(customerFieldLabel(item.user_text))}</span>
+                                <strong>下一步：${escapeHtml(item.recommendation)}</strong>
+                              </div>
+                            `
+                          )
+                          .join("")}
+                      </article>
+                    `
+                  )
+                  .join("")
+              : `<article class="pipeline-step"><strong>无不合格或复核项</strong><span>${escapeHtml(report.compliant_summary || "")}</span></article>`
+          }
+          <div><span>下一步动作</span><ul>${(report.customer_supplement_actions || report.next_actions || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+          <span>${escapeHtml(report.disclaimer || "")}</span>
+        `;
+      }
+
+      function renderDocumentQuality(document_quality, supplement_actions) {
+        if (!document_quality) {
+          $("documentQuality").innerHTML = "<p>上传审查后显示资料完整性、阻断性缺口和补件动作。</p>";
+          return;
+        }
+        const gaps = document_quality.blocking_gaps || [];
+        $("documentQuality").innerHTML = `
+          <div class="metric-grid two">
+            <div class="metric"><span>完整性评分</span><strong>${escapeHtml(document_quality.score)}</strong></div>
+            <div class="metric"><span>阻断性缺口</span><strong>${gaps.length}</strong></div>
+          </div>
+          <p>${document_quality.status === "needs_supplement" ? "资料存在阻断性缺口，主审应进入复核并要求补件。" : "资料可支撑预审，但最终仍需人工确认。"}</p>
+          <div><span>需补件清单</span><ul>${
+            supplement_actions.length
+              ? supplement_actions.map((item) => `<li>${escapeHtml(customerFieldLabel(item.action))}：${escapeHtml(item.reason)}</li>`).join("")
+              : "<li>当前未识别到阻断性补件动作。</li>"
+          }</ul></div>
+          <div><span>缺口证据</span><ul>${
+            gaps.length
+              ? gaps.map((gap) => `<li>${escapeHtml(gap.label)} · ${escapeHtml(gap.source)} · ${escapeHtml(gap.impact)}</li>`).join("")
+              : "<li>无阻断性缺口。</li>"
+          }</ul></div>
+        `;
+      }
+
+      function renderTaskDecomposition(items) {
+        $("taskDecomposition").innerHTML = items.length
+          ? items
+              .map(
+                (item) => `
+                  <article class="pipeline-step">
+                    <strong>${escapeHtml(item.agent)} · ${escapeHtml(item.objective)}</strong>
+                    <span>${escapeHtml(item.inputs)}</span>
+                    <code>${escapeHtml(item.review_task)}</code>
+                  </article>
+                `
+              )
+              .join("")
+          : `<article class="pipeline-step"><strong>任务拆解</strong><span>上传审查后显示多 Agent 子任务。</span></article>`;
+      }
+
+      function renderSourceDocuments(documents) {
+        if (!documents.length) {
+          $("sourceDocuments").textContent = "上传审查后查看 SDS、配方表和工艺资料。";
+          return;
+        }
+        $("sourceDocuments").textContent = documents
+          .map((document) => `${document.type} · ${document.filename || document.path}\n${document.content}`)
+          .join("\n\n---\n\n");
+      }
+
+      function renderReportSummary(summary) {
+        if (!summary) {
+          $("reportSummary").innerHTML = "<p>上传审查后生成预审报告摘要。</p>";
+          return;
+        }
+        $("reportSummary").innerHTML = `
+          <strong>预审报告摘要</strong>
+          <p>${escapeHtml(summary.case_summary)}</p>
+          <p>${escapeHtml(summary.material_completeness)}</p>
+          <div><span>主要风险</span><ul>${summary.major_risks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+          <div><span>补件建议</span><ul>${summary.supplement_requests.length ? summary.supplement_requests.map((item) => `<li>${escapeHtml(item)}</li>`).join("") : "<li>暂无补件要求。</li>"}</ul></div>
+          <p>${escapeHtml(summary.human_review_status)}</p>
+          <span>${escapeHtml(summary.disclaimer)}</span>
+        `;
+      }
+
+      function renderChiefSynthesis(chief) {
+        if (!chief) {
+          $("chiefSynthesis").innerHTML = "<p>上传审查后显示主审 Agent 汇总。</p>";
+          return;
+        }
+        $("chiefSynthesis").innerHTML = `
+          <strong>${escapeHtml(chief.final_verdict || "-")} · ${chief.needs_human ? "需人工复核" : "无需系统强制复核"}</strong>
+          <div><span>采纳分支</span><ul>${(chief.adopted_conclusions || []).map((item) => `<li>${escapeHtml(item.agent)}：${escapeHtml(item.verdict)} · ${escapeHtml((item.rule_refs || []).join(", "))}</li>`).join("")}</ul></div>
+          <div><span>复核项</span><ul>${(chief.review_items || []).length ? chief.review_items.map((item) => `<li>${escapeHtml(item)}</li>`).join("") : "<li>暂无强制复核项。</li>"}</ul></div>
+          <div><span>主审说明</span><ul>${(chief.synthesis || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+        `;
+      }
+
+      function renderSelectedRisk() {
+        const workbench = state.trace?.review_workbench;
+        const risk = workbench?.risk_items?.[state.selectedRisk];
+        if (!workbench || !risk) {
+          $("selectedRiskEvidence").innerHTML = "<p>上传审查后选择风险项查看证据链。</p>";
+          $("recommendedAction").innerHTML = "<p>上传审查后查看建议动作。</p>";
+          return;
+        }
+        const refs = new Set([...(risk.evidence_refs || []), ...(risk.rule_refs || []).map((rule) => `rule:${rule}`)]);
+        const evidence = workbench.evidence_chain.filter((item) =>
+          refs.size === 0 || refs.has(item.ref) || [...refs].some((ref) => item.ref.includes(ref.replace("rule:", "")))
+        );
+        $("selectedRiskEvidence").innerHTML = (evidence.length ? evidence : workbench.evidence_chain.slice(0, 4))
+          .map(
+            (item) => `
+              <article class="evidence">
+                <strong>${item.type} · ${item.ref}</strong>
+                <span>${item.version} · ${item.effective_date}</span>
+                <p>${escapeHtml(item.snippet)}</p>
+                <span>${escapeHtml(item.source_url || "")}</span>
+              </article>
+            `
+          )
+          .join("");
+        $("recommendedAction").innerHTML = `
+          <strong>${risk.verdict} · ${risk.severity}</strong>
+          <p>${escapeHtml(risk.recommended_action)}</p>
+          <span>${risk.requires_human_review ? "需要人工复核" : "无需系统强制复核"}</span>
+        `;
+      }
+
+      function selectRisk(index) {
+        state.selectedRisk = index;
+        renderReviewWorkbench(state.trace);
+      }
+
+      function renderTrace(trace) {
+        state.trace = trace;
+        state.selectedRisk = 0;
+        const nodes = trace.trace?.nodes || trace.nodes || [];
+        const selectedNodeExists = trace.nodes.some((node) => node.node_id === state.selectedNode);
+        if (!selectedNodeExists) {
+          state.selectedNode = trace.nodes[0]?.node_id || null;
+        }
+        $("graphEngine").textContent = trace.graph.engine;
+        const friendlyVerdict = renderCustomerFriendlyVerdict(trace.customer_report);
+        $("verdictText").textContent = friendlyVerdict.label;
+        $("reasonText").textContent = friendlyVerdict.reason;
+        $("verdictCard").className = `verdict-card ${verdictClass(friendlyVerdict.label)}`;
+        $("nodeCount").textContent = nodes.length;
+        $("chunkCount").textContent = trace.retrieval.chunks.length;
+        $("ruleCount").textContent = trace.rule_hits.length;
+        $("crossScore").textContent = trace.cross_check_score;
+        $("llmModel").textContent = `${trace.agent_orchestration.llm_provider} / ${trace.agent_orchestration.llm_model}`;
+        renderReviewWorkbench(trace);
+        renderRetrieval(trace.retrieval, trace.retrieval.queries?.[0] || "");
+        $("agentResults").innerHTML = Object.entries(trace.agent_branches || trace.sub_agent_results)
+          .map(
+            ([name, result]) => `
+              <article class="agent">
+                <strong>${name} Agent</strong>
+                <span class="tag ${verdictClass(result.verdict)}">${result.verdict}</span>
+                <span>${escapeHtml((result.reasoning_steps || result.reasons || []).join(" "))}</span>
+                <span>LLM: ${result.llm_used ? "已调用" : "未调用/降级"} · ${result.llm_provider || trace.agent_orchestration.llm_provider}</span>
+                <span>${escapeHtml(result.llm_reasoning || "")}</span>
+                <code>${escapeHtml(result.rag_query || "")}</code>
+                <code>${escapeHtml((result.rule_refs || result.hit_rules || []).join(", "))}</code>
+              </article>
+            `
+          )
+          .join("");
+        $("graphNodes").innerHTML = nodes
+          .map(
+            (node, index) => `
+              <article class="node ${node.node_id === state.selectedNode ? "active" : ""}" onclick="selectNode('${node.node_id}')">
+                <div class="node-index">${index + 1}</div>
+                <div>
+                  <strong>${node.label}</strong>
+                  <div class="tag ok">${node.status}</div>
+                </div>
+                <span class="tag">${Object.keys(node.output || {}).length} outputs</span>
+              </article>
+            `
+          )
+          .join("");
+        $("rules").innerHTML = trace.rule_hits
+          .map((hit) => `<article class="rule"><strong>${hit.jurisdiction} · ${hit.rule_id}</strong><code>${escapeHtml(JSON.stringify(hit, null, 2))}</code></article>`)
+          .join("");
+        $("evidences").innerHTML = trace.evidences
+          .map((item) => `<article class="evidence"><strong>${item.type} · ${item.ref}</strong><span>${item.version} · ${item.effective_date}</span><p>${escapeHtml(item.snippet)}</p></article>`)
+          .join("");
+        $("rawJson").textContent = JSON.stringify(
+          {
+            case_source: trace.case_source,
+            uploaded_documents: trace.uploaded_documents,
+            parsed_documents: trace.parsed_documents,
+            verdict: trace.verdict,
+            reasons: trace.reasons,
+            needs_human: trace.needs_human,
+            sub_agent_results: trace.sub_agent_results,
+            task_decomposition: trace.task_decomposition,
+            rag_queries: trace.rag_queries,
+            agent_branches: trace.agent_branches,
+            chief_synthesis: trace.chief_synthesis,
+            cross_check_score: trace.cross_check_score,
+            retrieval: trace.retrieval,
+            agent_orchestration: trace.agent_orchestration,
+            chief_review: trace.chief_review,
+            evidences: trace.evidences,
+            review_workbench: trace.review_workbench,
+            document_quality: trace.review_workbench?.document_quality,
+            supplement_actions: trace.review_workbench?.supplement_actions,
+          },
+          null,
+          2
+        );
+        renderDetail();
+        renderSelectedNodeDetail();
+      }
+
+      function selectNode(nodeId) {
+        state.selectedNode = nodeId;
+        renderTrace(state.trace);
+      }
+
+      function renderDetail() {
+        const node = state.trace?.nodes.find((item) => item.node_id === state.selectedNode);
+        $("detail").innerHTML = node
+          ? `<pre>${escapeHtml(JSON.stringify({ input: node.input, output: node.output }, null, 2))}</pre>`
+          : "<p>上传审查后查看节点详情。</p>";
+      }
+
+      function renderSelectedNodeDetail() {
+        const node = state.trace?.nodes.find((item) => item.node_id === state.selectedNode);
+        $("selectedNodeDetail").innerHTML = node
+          ? `<strong>${escapeHtml(node.label)} · ${escapeHtml(node.status)}</strong><span>当前节点输入输出</span><pre>${escapeHtml(JSON.stringify({ input: node.input, output: node.output }, null, 2))}</pre>`
+          : "<p>点击流程回放节点后，在这里查看该步骤的输入输出。</p>";
+      }
+
+      document.querySelectorAll(".collapse-toggle").forEach((button) => button.addEventListener("click", () => toggleSection(button)));
+      document.querySelectorAll(".sample-button").forEach((button) => button.addEventListener("click", () => loadSample(button.dataset.sample)));
+      $("refreshCases").addEventListener("click", () => loadCaseList().catch((error) => setStatus(error.message)));
+      $("documentFiles").addEventListener("change", () => {
+        if ($("documentFiles").files.length) clearDemoPackageSelection();
+        updateCaseActionState();
+      });
+      ["sdsFile", "formulaFile", "processFile"].forEach((id) =>
+        $(id).addEventListener("change", () => {
+          if ($(id).files.length) clearDemoPackageSelection();
+          updateCaseActionState();
+        })
+      );
+      $("showCustomerWorkbench").addEventListener("click", () => setWorkbenchMode("customer"));
+      $("showAdminWorkbench").addEventListener("click", () => setWorkbenchMode("admin"));
+      $("adminShowCustomerWorkbench").addEventListener("click", () => setWorkbenchMode("customer"));
+      $("adminShowAdminWorkbench").addEventListener("click", () => setWorkbenchMode("admin"));
+      $("openAdminEvidence").addEventListener("click", () => setWorkbenchMode("admin"));
+      $("reviewScenario").addEventListener("change", applyScenarioRecommendedChecks);
+      $("createCase").addEventListener("click", () => createCase().catch((error) => setStatus(error.message)));
+      $("clearCases").addEventListener("click", () => clearCases().catch((error) => setStatus(error.message)));
+      $("uploadCaseDocuments").addEventListener("click", () => uploadCaseDocuments().catch((error) => setStatus(error.message)));
+      $("runCaseReview").addEventListener("click", () => runCaseReview().catch((error) => setStatus(error.message)));
+      $("uploadKnowledgePack").addEventListener("click", uploadKnowledgePack);
+      $("clearKnowledgeFiles").addEventListener("click", clearKnowledgeFileInputs);
+      $("clearKnowledge").addEventListener("click", clearKnowledge);
+      $("loadChunks").addEventListener("click", loadChunks);
+      $("searchKnowledge").addEventListener("click", searchKnowledge);
+      $("clearQueryHistory").addEventListener("click", clearQueryHistory);
+      $("applySelectedReviewTasks").addEventListener("click", applySelectedReviewTasks);
+      $("clearSelectedReviewTasks").addEventListener("click", clearSelectedReviewTasks);
+      $("clearReviewTaskHistory").addEventListener("click", clearReviewTaskHistory);
+      $("runUploadReview").addEventListener("click", runUploadReview);
+      $("loadEval").addEventListener("click", loadEvaluation);
+
+      renderQueryHistory();
+      renderReviewTaskHistory();
+      renderPackagePrecheck(null);
+      updateCaseActionState();
+      loadReviewTaskPresets().catch((error) => setStatus(error.message));
+      loadCaseList().catch((error) => setStatus(error.message));
+      refreshKnowledgeStatus()
+        .then(() => setStatus("本地 API 可用"))
+        .catch((error) => setStatus(error.message));
+    </script>
+  </body>
+</html>

@@ -274,6 +274,53 @@ class SQLiteStore:
             "deleted_reports": int(report_count or 0),
         }
 
+    def delete_case(self, case_id: str) -> dict[str, int]:
+        with self._lock, self.connect() as connection:
+            case_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()["count"]
+            if not case_count:
+                return {"deleted_cases": 0, "deleted_documents": 0, "deleted_reports": 0}
+
+            document_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM documents WHERE case_id = ?",
+                (case_id,),
+            ).fetchone()["count"]
+            report_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM reports WHERE case_id = ?",
+                (case_id,),
+            ).fetchone()["count"]
+
+            connection.execute(
+                """
+                DELETE FROM review_decisions
+                WHERE finding_id IN (SELECT id FROM findings WHERE case_id = ?)
+                """,
+                (case_id,),
+            )
+            connection.execute("DELETE FROM audit_logs WHERE target_id = ?", (case_id,))
+            connection.execute("DELETE FROM findings WHERE case_id = ?", (case_id,))
+            connection.execute("DELETE FROM agent_runs WHERE case_id = ?", (case_id,))
+            connection.execute("DELETE FROM material_components WHERE case_id = ?", (case_id,))
+            connection.execute("DELETE FROM extracted_sections WHERE case_id = ?", (case_id,))
+            connection.execute(
+                """
+                DELETE FROM extraction_reviews
+                WHERE document_id IN (SELECT id FROM documents WHERE case_id = ?)
+                """,
+                (case_id,),
+            )
+            connection.execute("DELETE FROM documents WHERE case_id = ?", (case_id,))
+            connection.execute("DELETE FROM reports WHERE case_id = ?", (case_id,))
+            connection.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+
+        return {
+            "deleted_cases": int(case_count or 0),
+            "deleted_documents": int(document_count or 0),
+            "deleted_reports": int(report_count or 0),
+        }
+
     def update_case_review_state(
         self,
         *,

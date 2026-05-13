@@ -1,0 +1,227 @@
+/* case-board.css — Phase 2a / #/cases 看板页独有样式。
+   `.dot` / `.chip` / `.cta-primary` / `.link` 已在 shell.css，本文件不重复定义。 */
+
+/* —— hd 标题区 —— */
+.cb-hd {
+  padding: 48px 64px 32px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+.cb-hd .cb-title {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.07;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+.cb-hd .cb-lead {
+  font-size: 17px;
+  color: var(--ink-48);
+  line-height: 1.4;
+  margin-top: 12px;
+  letter-spacing: -0.374px;
+}
+
+/* —— subbar 工具条 —— */
+.cb-subbar {
+  padding: 16px 64px;
+  background: var(--parchment);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--ink-80);
+  letter-spacing: -0.224px;
+}
+.cb-subbar .seg {
+  display: flex;
+  gap: 0;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 3px;
+}
+.cb-subbar .seg button {
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-family: var(--font-text);
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink-80);
+  letter-spacing: -0.224px;
+}
+.cb-subbar .seg button.on {
+  background: var(--canvas);
+  color: var(--ink);
+  font-weight: 600;
+}
+.cb-subbar .count { color: var(--ink-48); }
+.cb-subbar .count b { color: var(--ink); font-weight: 600; }
+.cb-subbar .spacer { flex: 1; }
+.cb-subbar input {
+  height: 36px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  padding: 0 16px;
+  font: inherit;
+  font-family: var(--font-text);
+  font-size: 14px;
+  color: var(--ink);
+  width: 240px;
+  letter-spacing: -0.224px;
+}
+
+/* —— grid —— */
+.cb-grid {
+  padding: 32px 64px 80px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+/* —— card —— */
+.cb-card {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-family: var(--font-text);
+  color: var(--ink);
+  position: relative;
+}
+.cb-card:hover { border-color: var(--ink-48); }
+.cb-card .cap {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.cb-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.374px;
+  color: var(--ink);
+  margin-top: 4px;
+}
+.cb-card .meta {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+}
+.cb-card .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cb-card .foot {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--divider-soft);
+}
+.cb-card .status {
+  font-size: 13px;
+  color: var(--ink-48);
+  letter-spacing: -0.12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cb-card .link {
+  color: var(--primary);
+  font-size: 14px;
+  text-decoration: none;
+  letter-spacing: -0.224px;
+}
+
+.cb-delete {
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-48);
+  cursor: pointer;
+  margin-left: 10px;
+}
+.cb-delete:hover {
+  border-color: var(--block);
+  color: var(--block);
+}
+.cb-delete:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* —— 末位 dashed 新建占位卡 —— */
+.cb-card.empty {
+  background: var(--parchment);
+  border: 1px dashed var(--hairline);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 240px;
+  padding: 40px;
+  cursor: pointer;
+  gap: 0;
+}
+.cb-card.empty .big {
+  font-size: 34px;
+  font-weight: 300;
+  color: var(--ink-48);
+  line-height: 1;
+  letter-spacing: -0.374px;
+}
+.cb-card.empty .lab {
+  font-size: 14px;
+  color: var(--ink-48);
+  margin-top: 12px;
+  letter-spacing: -0.224px;
+}
+
+/* —— 列表为空时的居中空态容器（§6） —— */
+.cb-empty-wrap {
+  padding: 80px 64px 120px;
+  display: flex;
+  justify-content: center;
+}
+.cb-empty-wrap .inner {
+  max-width: 480px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1.2;
+  letter-spacing: -0.374px;
+  color: var(--ink-48);
+}
+
+/* —— 错误条 —— */
+.cb-error {
+  margin: 0 64px 24px;
+  padding: 16px 20px;
+  background: var(--parchment);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  color: var(--block);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}

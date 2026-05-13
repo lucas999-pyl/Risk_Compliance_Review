@@ -1,5 +1,0 @@
-检测报告
-样品：BPA Free Epoxy Additive
-检测项目：BPA
-结果：检测报告检出 Bisphenol A CAS 80-05-7 0.12% w/w。
-结论：与供应商不含 BPA 声明不一致。

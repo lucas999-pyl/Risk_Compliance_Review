@@ -3,9 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from datetime import datetime
+
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.models import (
     CaseCreate,
@@ -27,8 +30,6 @@ from app.models import (
 )
 from app.ai_clients import AIClientConfig, EmbeddingClient
 from app.chemical_rag import ChemicalRagRunner, CHECK_TYPE_LABELS, LEGACY_CHECK_TYPE_MAP, SCENARIO_RECOMMENDED_CHECK_TYPES
-from app.demo_cases import demo_case_catalog
-from app import reporting
 from app.service import ComplianceReviewService
 from app.settings import Settings
 from app.store import SQLiteStore
@@ -48,14 +49,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     store = SQLiteStore(settings.database_path, settings.storage_dir)
     ai_config = AIClientConfig(
-        base_url=settings.openai_compatible_base_url,
-        api_key=settings.openai_compatible_api_key,
+        base_url=settings.chem_rag_embedding_base_url,
+        api_key=settings.chem_rag_embedding_api_key,
         embedding_provider=settings.chem_rag_embedding_provider if settings.enable_llm else "hash",
         embedding_model=settings.chem_rag_embedding_model,
         embedding_dimensions=settings.chem_rag_embedding_dimensions,
         llm_provider=settings.chem_rag_llm_provider if settings.enable_llm else "disabled",
         llm_model=settings.chem_rag_llm_model,
         timeout_seconds=settings.chem_rag_request_timeout_seconds,
+        llm_base_url=settings.chem_rag_llm_base_url,
+        llm_api_key=settings.chem_rag_llm_api_key,
     )
     embedding_client = EmbeddingClient(ai_config)
     vector_store = SQLiteVectorStore(Path(settings.chem_rag_vector_store_dir) / "vectors.sqlite3", embedding_client)
@@ -73,6 +76,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.mount(
+        "/static",
+        StaticFiles(directory=Path(__file__).parent / "static"),
+        name="static",
+    )
+
     def get_service() -> ComplianceReviewService:
         return app.state.service
 
@@ -87,20 +96,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def workbench() -> FileResponse:
         return FileResponse(Path(__file__).parent / "static" / "index.html", media_type="text/html; charset=utf-8")
 
+    @app.get("/legacy", include_in_schema=False)
+    def legacy() -> FileResponse:
+        return FileResponse(Path(__file__).parent / "static" / "legacy.html", media_type="text/html; charset=utf-8")
+
     @app.get("/data_samples/chemical_rag_dataset/upload_samples/{filename}", include_in_schema=False)
     def chemical_upload_sample(filename: str) -> FileResponse:
         sample_dir = Path(__file__).resolve().parents[2] / "data_samples" / "chemical_rag_dataset" / "upload_samples"
         sample_path = (sample_dir / filename).resolve()
         if sample_path.parent != sample_dir.resolve() or not sample_path.exists():
             raise HTTPException(status_code=404, detail="Sample file not found")
-        return FileResponse(sample_path)
-
-    @app.get("/data_samples/chemical_rag_dataset/documents/{filename}", include_in_schema=False)
-    def chemical_dataset_document(filename: str) -> FileResponse:
-        sample_dir = Path(__file__).resolve().parents[2] / "data_samples" / "chemical_rag_dataset" / "documents"
-        sample_path = (sample_dir / filename).resolve()
-        if sample_path.parent != sample_dir.resolve() or not sample_path.exists():
-            raise HTTPException(status_code=404, detail="Dataset file not found")
         return FileResponse(sample_path)
 
     @app.get("/data_samples/chemical_knowledge_sources/official_pack_2026_05/{filename}", include_in_schema=False)
@@ -270,10 +275,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict:
         return runner.retrieval_preview(payload.case_id, top_k=payload.top_k)
 
-    @app.get("/chemical/demo-cases")
-    def chemical_demo_cases() -> dict:
-        return demo_case_catalog()
-
     @app.get("/chemical/cases")
     def chemical_case_list() -> dict:
         return {"cases": store.list_cases()}
@@ -281,6 +282,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.delete("/chemical/cases")
     def chemical_case_clear() -> dict:
         return store.delete_cases()
+
+    @app.delete("/chemical/cases/{case_id}")
+    def chemical_case_delete(case_id: str) -> dict:
+        deleted = store.delete_case(case_id)
+        if deleted.get("deleted_cases", 0) == 0:
+            return {"deleted_cases": 0, "deleted_documents": 0, "deleted_reports": 0, "already_deleted": True}
+        return deleted
 
     @app.post("/chemical/cases", status_code=201)
     def chemical_case_create(payload: CaseCreate) -> dict:
@@ -309,33 +317,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "latest_report": latest_payload,
             "package_precheck": latest_payload.get("package_precheck") if latest_payload else None,
         }
-
-    @app.get("/chemical/cases/{case_id}/report.json")
-    def chemical_case_report_json(case_id: str) -> JSONResponse:
-        report = _latest_customer_report_or_404(store, case_id)
-        return JSONResponse(report, headers={"Content-Disposition": f'attachment; filename="{reporting.customer_report_filename(report, "json")}"'})
-
-    @app.get("/chemical/cases/{case_id}/report.html")
-    def chemical_case_report_html(case_id: str) -> Response:
-        report = _latest_customer_report_or_404(store, case_id)
-        return Response(
-            content=reporting.render_customer_report_html(report),
-            media_type="text/html; charset=utf-8",
-            headers={"Content-Disposition": f'inline; filename="{reporting.customer_report_filename(report, "html")}"'},
-        )
-
-    @app.get("/chemical/cases/{case_id}/report.pdf")
-    async def chemical_case_report_pdf(case_id: str) -> Response:
-        report = _latest_customer_report_or_404(store, case_id)
-        try:
-            pdf = await reporting.render_customer_report_pdf_async(report)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        return Response(
-            content=pdf,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{reporting.customer_report_filename(report, "pdf")}"'},
-        )
 
     @app.post("/chemical/cases/{case_id}/documents", status_code=201)
     async def chemical_case_upload_documents(
@@ -489,11 +470,81 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def technology_evaluation(runner: ChemicalRagRunner = Depends(get_chemical_runner)) -> dict:
         return runner.evaluate_dataset()
 
+    @app.get("/cases/{case_id}/print", include_in_schema=False)
+    def case_report_print_template(case_id: str) -> HTMLResponse:
+        """打印态 HTML。chromium 内部访问转 PDF；也允许人工打开调试。无 nav / 无 sidebar。"""
+        from app.pdf_render import build_print_html
+
+        case = store.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        latest = store.latest_report(case_id)
+        if not latest:
+            raise HTTPException(status_code=409, detail="Case has no completed review yet")
+        documents = store.get_documents(case_id)
+        html = build_print_html(case, latest["payload"], documents=documents)
+        return HTMLResponse(html)
+
+    @app.get("/api/cases/{case_id}/report.pdf", include_in_schema=False)
+    async def case_report_pdf(case_id: str) -> Response:
+        from app.pdf_render import (
+            CaseNotReady,
+            PDFRendererUnavailable,
+            render_case_report_pdf,
+        )
+
+        case = store.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        latest = store.latest_report(case_id)
+        if not latest:
+            return JSONResponse(
+                {"error": "Case has no completed review yet"},
+                status_code=409,
+            )
+        host = getattr(settings, "pdf_render_base_url", None) or "http://127.0.0.1:8888"
+        try:
+            pdf_bytes = await render_case_report_pdf(case_id, store, base_url=host)
+        except CaseNotReady:
+            return JSONResponse(
+                {"error": "Case has no completed review yet"},
+                status_code=409,
+            )
+        except PDFRendererUnavailable as exc:
+            from app.pdf_render import build_fallback_pdf, render_case_report_pdf_with_system_browser
+
+            documents = store.get_documents(case_id)
+            try:
+                pdf_bytes = render_case_report_pdf_with_system_browser(case, latest["payload"], documents=documents)
+            except PDFRendererUnavailable:
+                pdf_bytes = build_fallback_pdf(case, latest["payload"])
+        except Exception as exc:  # noqa: BLE001
+            return JSONResponse(
+                {"error": "Template render failed", "case_id": case_id, "detail": str(exc)},
+                status_code=500,
+            )
+        today = datetime.now().strftime("%Y%m%d")
+        # RFC 5987 encoding for non-ASCII filename (HTTP headers must be latin-1)
+        from urllib.parse import quote as _urlquote
+
+        ascii_fallback = f"{case_id}_report_{today}.pdf"
+        full_name = f"{case_id}_审查报告_{today}.pdf"
+        encoded = _urlquote(full_name, safe="")
+        disposition = (
+            f'attachment; filename="{ascii_fallback}"; '
+            f"filename*=UTF-8''{encoded}"
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": disposition},
+        )
+
     return app
 
 
 def _parse_target_markets(value: str) -> list[str]:
-    allowed = {"CN", "EU", "US", "GLOBAL"}
+    allowed = {"CN", "EU", "US", "KR", "JP", "GLOBAL"}
     markets = [item.strip().upper() for item in value.replace(";", ",").split(",") if item.strip()]
     filtered = [item for item in markets if item in allowed]
     return filtered or ["CN", "EU", "US"]
@@ -567,16 +618,6 @@ def _documents_for_runner(store: SQLiteStore, case_id: str) -> list[dict]:
             }
         )
     return documents
-
-
-def _latest_customer_report_or_404(store: SQLiteStore, case_id: str) -> dict:
-    if not store.get_case(case_id):
-        raise HTTPException(status_code=404, detail="Case not found")
-    latest = store.latest_report(case_id)
-    report = reporting.latest_customer_report(latest["payload"] if latest else None)
-    if not report:
-        raise HTTPException(status_code=404, detail="Case has no customer report")
-    return report
 
 
 def _persist_case_review(store: SQLiteStore, case_id: str, trace: dict) -> None:

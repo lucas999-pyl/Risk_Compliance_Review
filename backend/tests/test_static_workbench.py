@@ -19,7 +19,7 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
         )
     )
 
-    response = client.get("/")
+    response = client.get("/legacy")
 
     assert response.status_code == 200
     assert "化工合规 RAG 工具" in response.text
@@ -50,7 +50,7 @@ def test_static_workbench_is_served_with_upload_review_tabs(tmp_path: Path) -> N
 
 
 def test_customer_case_flow_is_primary_and_admin_debug_is_isolated() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert 'id="customerWorkbench"' in html
     assert 'id="adminWorkbench"' in html
@@ -99,7 +99,7 @@ def test_customer_case_flow_is_primary_and_admin_debug_is_isolated() -> None:
 
 
 def test_trace_node_click_selection_is_not_reset_on_rerender() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "function selectNode(nodeId)" in html
     assert "state.selectedNode = nodeId;" in html
@@ -109,7 +109,7 @@ def test_trace_node_click_selection_is_not_reset_on_rerender() -> None:
 
 
 def test_workbench_has_collapsible_result_sections_and_safe_text_wrapping() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert 'class="collapse-toggle"' in html
     assert 'data-target="ragPipeline"' in html
@@ -126,7 +126,7 @@ def test_workbench_has_collapsible_result_sections_and_safe_text_wrapping() -> N
 
 
 def test_static_workbench_defaults_to_business_review_loop() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "原始资料" in html
     assert "抽取校验" in html
@@ -144,7 +144,7 @@ def test_static_workbench_defaults_to_business_review_loop() -> None:
 
 
 def test_static_workbench_promotes_knowledge_base_and_upload_review() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "知识库工作台" in html
     assert "上传审查" in html
@@ -166,7 +166,7 @@ def test_static_workbench_promotes_knowledge_base_and_upload_review() -> None:
 
 
 def test_static_workbench_is_task_driven_upload_review() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "审查任务" in html
     assert "供应商资料包" in html
@@ -188,7 +188,7 @@ def test_static_workbench_is_task_driven_upload_review() -> None:
 
 
 def test_static_workbench_uses_official_pack_and_business_query_workbench() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "上传官方知识库源文档" in html
     assert "manifest_file" in html
@@ -208,7 +208,7 @@ def test_static_workbench_uses_official_pack_and_business_query_workbench() -> N
 
 
 def test_static_workbench_moves_presets_to_review_task_multi_select() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "任务推荐" in html
     assert "reviewTaskPresets" in html
@@ -229,7 +229,7 @@ def test_static_workbench_moves_presets_to_review_task_multi_select() -> None:
 
 
 def test_static_workbench_explains_button_roles_and_empty_knowledge_state() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "主流程：1 上传官方知识库源文档" in html
     assert "内置评测集已收纳到开发者折叠区" in html
@@ -242,7 +242,7 @@ def test_static_workbench_explains_button_roles_and_empty_knowledge_state() -> N
 
 
 def test_static_workbench_locks_actions_while_uploading_knowledge_pack() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert 'id="clearKnowledgeFiles"' in html
     assert "清除已选文件" in html
@@ -256,7 +256,7 @@ def test_static_workbench_locks_actions_while_uploading_knowledge_pack() -> None
 
 
 def test_static_workbench_demotes_quality_evaluation_to_collapsed_developer_panel() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert 'id="evalTab"' not in html
     assert 'id="traceTab"' not in html
@@ -271,7 +271,7 @@ def test_static_workbench_demotes_quality_evaluation_to_collapsed_developer_pane
 
 
 def test_static_workbench_explains_source_documents_and_inline_flow_replay_detail() -> None:
-    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[1] / "app" / "static" / "legacy.html").read_text(encoding="utf-8")
 
     assert "原始资料（上传文件原文 / 抽取依据）" in html
     assert "用于核对系统是否真实读取了 SDS、配方表和工艺说明" in html

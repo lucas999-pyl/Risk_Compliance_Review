@@ -1,0 +1,25 @@
+<!-- case-board.html — 模板片段，仅 .frame > .main 内的结构（HANDOFF #4a §3）。
+     由 index.js fetch 注入到 #route-outlet；不要直接打开此文件作为页面。 -->
+<div class="cb-hd">
+  <div>
+    <h1 class="cb-title">Case 看板</h1>
+    <div class="cb-lead" data-cb="lead">加载中…</div>
+  </div>
+  <button class="cta-primary" data-cb="new">新建 Case</button>
+</div>
+
+<div class="cb-subbar">
+  <div class="seg" data-cb="seg">
+    <button class="on" data-filter="all" type="button">全部</button>
+    <button data-filter="in_progress" type="button">进行中</button>
+    <button data-filter="done" type="button">已完成</button>
+    <button data-filter="needs_rerun" type="button">待重跑</button>
+  </div>
+  <div class="count" data-cb="count"><b>0</b> Case</div>
+  <div class="spacer"></div>
+  <input data-cb="search" placeholder="搜索案件标题 / 编号" />
+</div>
+
+<div data-cb="error-slot"></div>
+
+<div class="cb-grid" data-cb="grid"></div>

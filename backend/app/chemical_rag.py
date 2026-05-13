@@ -84,12 +84,31 @@ FORMULA_COMPONENT_PATTERN = re.compile(
 )
 PROCESS_FIELD_PATTERN = re.compile(r"(?m)^\s*(?P<key>温度|压力|关键步骤|设备|工艺名称)\s*[:：]\s*(?P<value>.+?)\s*$")
 PROCESS_EXTRA_FIELD_PATTERN = re.compile(r"(?m)^\s*(?P<key>储存条件|储存类别|运输信息)\s*[:：]\s*(?P<value>.+?)\s*$")
-TEMPERATURE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*(?:C|℃)", re.IGNORECASE)
+TEMPERATURE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*°?\s*(?:C|℃)\b", re.IGNORECASE)
 DATE_PATTERN = re.compile(r"(?P<year>\d{4})[-/](?P<month>\d{1,2})[-/](?P<day>\d{1,2})")
 HARD_STOP_RULES = {
     "incompatibility_oxidizer_flammable",
     "incompatibility_hypochlorite_acid",
     "enterprise_redline_benzene",
+    "voc_limit_exceeded",
+}
+# VOC 抽取：匹配 "VOC ... <数字> g/L" 形式，兼容 "总 VOC"、"VOC 含量"、"VOC 350 g/L" 等中英行话。
+VOC_VALUE_PATTERN = re.compile(
+    r"(?:总\s*)?VOC(?:\s*含量)?[^0-9\n]{0,12}(?P<value>\d+(?:\.\d+)?)\s*g\s*/\s*L",
+    re.IGNORECASE,
+)
+# VOC 超标声明：文本中显式出现 "VOC <值> g/L 超 ... <limit> g/L 限值"，由参考限值与实测对比确认。
+VOC_EXCEEDANCE_PATTERN = re.compile(
+    r"VOC[^超符\n]{0,40}(?P<value>\d+(?:\.\d+)?)\s*g\s*/\s*L[^符\n]{0,40}超(?:过|出)?[^0-9\n]{0,40}(?P<limit>\d+(?:\.\d+)?)\s*g\s*/\s*L",
+    re.IGNORECASE,
+)
+# 资料里明确出现 "voc_limit_exceeded" 规则标识也作为强信号（被 sub-X demo 文档写入）。
+VOC_RULE_ID_PATTERN = re.compile(r"voc_limit_exceeded", re.IGNORECASE)
+# GB 30981-2020 水性双组分工业防护涂料 250 g/L 限值，作为兜底硬阻断阈值（最严类别）。
+VOC_HARD_STOP_LIMIT_GL = 250.0
+# 绝对阻断规则：即便资料缺失/未知组分也直接判定不合规（regulatory ceiling 类）。
+ABSOLUTE_HARD_STOP_RULES = {
+    "voc_limit_exceeded",
 }
 REVIEW_RULES = {
     "sds_missing_sections",
@@ -104,15 +123,40 @@ REVIEW_RULES = {
     "oxidizer_high_temperature_process",
     "sds_revision_outdated",
     "transport_un_mismatch",
-    "supplier_evidence_conflict",
-    "cross_file_identity_conflict",
+}
+RULE_NAME_ZH_FALLBACK = {
+    "document_completeness_precheck": "资料完整性预检",
+    "formula_components_missing": "配方组分缺失核查",
+    "package_precheck": "资料包预检",
+    "knowledge_pack_missing_review": "规则库资料缺失复核",
+    "knowledge_no_match_review": "法规知识未命中复核",
+    "sds_missing_sections": "安全技术说明书关键章节缺失核查",
+    "sds_key_sections": "安全技术说明书关键章节核查",
+    "tsca_inventory_match": "美国化学品清单状态核查",
+    "hazardous_catalog_match": "危险化学品目录命中核查",
+    "ghs_label_pictogram_missing": "化学品分类标签与象形图核查",
+    "sds_section_completeness": "安全技术说明书章节完整性核查",
+    "incompatibility_oxidizer_flammable": "可燃液体与氧化剂禁忌组合",
+    "incompatibility_hypochlorite_acid": "次氯酸盐与酸类禁忌组合",
+    "source_backed_no_restricted_demo_match": "禁限用物质证据化筛查",
+    "svhc_threshold_match": "欧盟高度关注物质阈值核查",
+    "voc_limit_exceeded": "挥发性有机物限值合规核查",
+    "formula_cas_missing": "配方组分登记号完整性核查",
+    "process_parameters_missing": "工艺关键参数完整性核查",
+    "flammable_storage_missing": "可燃液体储存条件核查",
+    "enterprise_redline_benzene": "企业红线禁苯核查",
+    "transport_un_mismatch": "运输编号与物料危险类别一致性",
+    "sds_revision_outdated": "安全技术说明书修订日期时效核查",
+    "oxidizer_high_temperature_process": "氧化剂高温工艺安全核查",
+    "unknown_substance_review": "未知 / 未命中物质复核",
+    "manual_review": "人工复核",
 }
 CHECK_TYPE_LABELS = {
     "intake_readiness": "资料完整性与可审性",
-    "ingredient_identity": "成分识别与 CAS/浓度完整性",
+    "ingredient_identity": "成分识别与登记号/浓度完整性",
     "restricted_substance": "禁限用物质与红线物质筛查",
     "compatibility_risk": "物料相容性与危险组合",
-    "sds_key_sections": "SDS 关键章节核查",
+    "sds_key_sections": "安全技术说明书关键章节核查",
     "process_fit": "工艺条件适配性",
     "storage_transport": "储存与运输条件核查",
     "regulatory_screening": "目标市场法规匹配",
@@ -135,7 +179,7 @@ CHECK_TYPE_AGENTS = {
     "process_fit": "工艺",
     "storage_transport": "储运",
     "regulatory_screening": "法规",
-    "supplier_evidence_consistency": "供应商证据",
+    "supplier_evidence_consistency": "资料完整性",
     "manual_review": "资料完整性",
 }
 AGENT_CHECK_TYPES = {agent: check_type for check_type, agent in CHECK_TYPE_AGENTS.items()}
@@ -192,7 +236,7 @@ SCENARIO_RECOMMENDED_CHECK_TYPES = {
 }
 DEFAULT_CHECK_TYPES = SCENARIO_RECOMMENDED_CHECK_TYPES["market_access"]
 DOCUMENT_TYPE_LABELS = {
-    "sds": "SDS 安全技术说明书",
+    "sds": "安全技术说明书",
     "formula": "配方/成分表",
     "process": "工艺说明",
     "storage_transport": "储运资料",
@@ -202,10 +246,10 @@ DOCUMENT_TYPE_LABELS = {
 }
 CORE_DOCUMENT_TYPES = ("sds", "formula", "process")
 CUSTOMER_FIELD_LABELS = {
-    "sds_sections": "SDS 16 章节",
+    "sds_sections": "安全技术说明书 16 章节",
     "supplier": "供应商名称",
-    "revision_date": "SDS 修订日期",
-    "cas_numbers": "成分 CAS 号",
+    "revision_date": "安全技术说明书修订日期",
+    "cas_numbers": "成分登记号",
     "component_concentrations": "成分浓度",
     "process_temperature": "工艺温度",
     "process_pressure": "工艺压力",
@@ -216,6 +260,23 @@ CUSTOMER_FIELD_LABELS = {
     "test_report": "检测报告",
     "machine_readable_text": "可复制文字版资料",
 }
+
+DISPLAY_LABEL_REPLACEMENTS = (
+    (re.compile(r"\bREACH/SVHC\b"), "欧盟化学品法规/高度关注物质"),
+    (re.compile(r"\bTSCA/HCS\b"), "美国化学品清单/危害沟通标准"),
+    (re.compile(r"\bTSCA\b"), "美国化学品清单"),
+    (re.compile(r"\bGHS\b"), "全球统一分类和标签制度"),
+    (re.compile(r"\bSDS\b"), "安全技术说明书"),
+    (re.compile(r"\bMSDS\b"), "安全技术说明书"),
+    (re.compile(r"\bVOC\b"), "挥发性有机物"),
+    (re.compile(r"\bCAS\b"), "化学文摘登记号"),
+    (re.compile(r"\bSVHC\b"), "高度关注物质"),
+    (re.compile(r"\bREACH\b"), "欧盟化学品法规"),
+    (re.compile(r"\bHCS\b"), "危害沟通标准"),
+    (re.compile(r"\bEHS\b"), "环境健康安全"),
+    (re.compile(r"\bUN\s*编号\b"), "运输编号"),
+    (re.compile(r"\bUN\b"), "运输编号"),
+)
 EMPTY_UPLOADED_DOCUMENT: dict[str, Any] = {
     "filename": "",
     "path": "",
@@ -250,14 +311,16 @@ class ChemicalRagRunner:
         self.settings = settings or Settings()
         self.dataset_root = dataset_root
         self.ai_config = AIClientConfig(
-            base_url=self.settings.openai_compatible_base_url,
-            api_key=self.settings.openai_compatible_api_key,
+            base_url=self.settings.chem_rag_embedding_base_url,
+            api_key=self.settings.chem_rag_embedding_api_key,
             embedding_provider=self.settings.chem_rag_embedding_provider if self.settings.enable_llm else "hash",
             embedding_model=self.settings.chem_rag_embedding_model,
             embedding_dimensions=self.settings.chem_rag_embedding_dimensions,
             llm_provider=self.settings.chem_rag_llm_provider if self.settings.enable_llm else "disabled",
             llm_model=self.settings.chem_rag_llm_model,
             timeout_seconds=self.settings.chem_rag_request_timeout_seconds,
+            llm_base_url=self.settings.chem_rag_llm_base_url,
+            llm_api_key=self.settings.chem_rag_llm_api_key,
         )
         self.embedding_client = vector_store.embedding_client if vector_store else EmbeddingClient(self.ai_config)
         self.vector_store = vector_store or SQLiteVectorStore(
@@ -479,7 +542,7 @@ class ChemicalRagRunner:
         }
         retrieved = self._merge_retrievals(retrieval_by_agent)
 
-        base_hits = self._base_rule_hits(case, parsed_sds, formula, components, process, retrieved)
+        base_hits = self._base_rule_hits(case, parsed_sds, formula, components, process, retrieved, sds_text=sds_text)
         completeness_agent_result = self._with_llm(
             "资料完整性",
             self._completeness_agent(parsed_sds, formula, process, components),
@@ -492,8 +555,6 @@ class ChemicalRagRunner:
             "储运": self._storage_agent(components, formula, parsed_sds, process),
             "法规": self._regulatory_agent(case, components, retrieval_by_agent.get("法规", retrieved), parsed_sds),
         }
-        if "供应商证据" in {CHECK_TYPE_AGENTS[item] for item in case["check_types"] if item in CHECK_TYPE_AGENTS}:
-            base_agent_results["供应商证据"] = self._supplier_evidence_agent(case, parsed_sds, formula, process)
         sub_agent_results = self._with_llm_concurrently(
             base_agent_results,
             retrieved,
@@ -1006,6 +1067,27 @@ class ChemicalRagRunner:
     def _load_rules_pack(self) -> dict[str, Any]:
         return json.loads((self.dataset_root / "knowledge" / "chemical_rules_pack.json").read_text(encoding="utf-8"))
 
+    def _rule_meta_index(self) -> dict[str, dict[str, Any]]:
+        """Return a {rule_id -> rule_meta_dict} index from the rules pack.
+
+        Tolerates absence of the top-level ``rules`` array (sub-X may still be
+        adding it). Cached on the instance after first read.
+        """
+        cached = getattr(self, "_rule_meta_index_cache", None)
+        if cached is not None:
+            return cached
+        pack = self._load_rules_pack()
+        rules = pack.get("rules") or []
+        index: dict[str, dict[str, Any]] = {}
+        for rule in rules:
+            rule_id = rule.get("rule_id")
+            if isinstance(rule_id, str) and rule_id:
+                index[rule_id] = rule
+        for rule_id, rule_name_zh in RULE_NAME_ZH_FALLBACK.items():
+            index.setdefault(rule_id, {"rule_id": rule_id, "rule_name_zh": rule_name_zh})
+        self._rule_meta_index_cache = index
+        return index
+
     def _pack_sources_for_chunks(self) -> list[dict[str, Any]]:
         sources = []
         for index, source in enumerate(self._load_rules_pack()["sources"]):
@@ -1378,6 +1460,31 @@ class ChemicalRagRunner:
                     "tags": sorted(profile.tags),
                 }
             )
+        if not components:
+            from app.document_parser import extract_components_from_markdown_table
+
+            seen_cas: set[str] = set()
+            for extracted in extract_components_from_markdown_table(text):
+                if extracted.cas in seen_cas:
+                    continue
+                seen_cas.add(extracted.cas)
+                raw_name = extracted.name
+                cas = extracted.cas
+                profile = normalize_substance(raw_name, cas)
+                components.append(
+                    {
+                        "substance_id": profile.substance_id,
+                        "name": profile.name,
+                        "raw_name": raw_name,
+                        "cas": cas,
+                        "ec": extracted.ec or profile.ec,
+                        "concentration_min": extracted.concentration_min,
+                        "concentration_max": extracted.concentration_max,
+                        "concentration_text": extracted.concentration_text or f"{extracted.concentration_min}%",
+                        "known": cas in KNOWN_SUBSTANCES,
+                        "tags": sorted(profile.tags),
+                    }
+                )
         unresolved_component_lines = [
             line.strip(" -")
             for line in text.splitlines()
@@ -1400,12 +1507,22 @@ class ChemicalRagRunner:
         fields = {match.group("key"): match.group("value").strip() for match in PROCESS_FIELD_PATTERN.finditer(text)}
         for match in PROCESS_EXTRA_FIELD_PATTERN.finditer(text):
             fields[match.group("key")] = match.group("value").strip()
+        temperatures = [float(match.group("value")) for match in TEMPERATURE_PATTERN.finditer(text)]
+        if "温度" not in fields and temperatures:
+            fields["温度"] = f"工艺温度范围检测到 {min(temperatures):g}-{max(temperatures):g}℃"
+        if "压力" not in fields:
+            pressure_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:MPa|kPa|bar|atm)|常压|大气压", text, re.IGNORECASE)
+            if pressure_match:
+                fields["压力"] = pressure_match.group(0).strip()
+        if "关键步骤" not in fields:
+            step_count = len(re.findall(r"(?m)^#{1,4}\s*\d+[\.\、]\s*\S+", text))
+            if step_count >= 3 or "工艺步骤" in text or "工序" in text:
+                fields["关键步骤"] = f"识别到 {step_count} 个步骤段落" if step_count else "包含工艺步骤段落"
         missing = []
         for key in ["温度", "压力", "关键步骤"]:
             value = fields.get(key, "")
-            if not value or "未提供" in value:
+            if not value or "未提供" in value or "适宜温度" in value or "适当" in value:
                 missing.append(key)
-        temperatures = [float(match.group("value")) for match in TEMPERATURE_PATTERN.finditer(text)]
         return {
             "fields": fields,
             "missing_fields": missing,
@@ -1521,7 +1638,6 @@ class ChemicalRagRunner:
             "工艺": "process temperature pressure mixing cleaning electronics oxidizer high temperature incompatible operation",
             "储运": "storage transport UN number compatibility oxidizer flammable acid hypochlorite segregation",
             "法规": "CN EU US REACH SVHC TSCA OSHA HCS hazardous chemicals catalog market access",
-            "供应商证据": "supplier declaration test report certificate evidence consistency CAS concentration conflict contradiction",
         }
         queries = {}
         for task in task_decomposition:
@@ -1699,8 +1815,19 @@ class ChemicalRagRunner:
         components: list[dict[str, Any]],
         process: dict[str, Any],
         retrieved: list[RankedChunk],
+        *,
+        sds_text: str = "",
     ) -> list[dict[str, Any]]:
         hits = []
+        if self._voc_limit_exceeded(sds_text, formula.get("text", ""), process.get("text", "")):
+            hits.append(
+                self._rule_hit(
+                    "voc_limit_exceeded",
+                    "CN",
+                    ["sds_document", "formula_document"],
+                    0.95,
+                )
+            )
         section_numbers = set(parsed_sds.metadata["sds_section_numbers"])
         if section_numbers == set(range(1, 17)):
             hits.append(self._rule_hit("sds_complete", "GLOBAL", ["sds_document"], 0.92))
@@ -1732,10 +1859,6 @@ class ChemicalRagRunner:
             hits.append(self._rule_hit("sds_revision_outdated", "GLOBAL", ["sds_document"], 0.82))
         if self._has_transport_un_mismatch(parsed_sds, components, process):
             hits.append(self._rule_hit("transport_un_mismatch", "GLOBAL", ["sds_document", "process_document"], 0.78))
-        if self._has_supplier_evidence_conflict(case, parsed_sds, formula, process):
-            hits.append(self._rule_hit("supplier_evidence_conflict", "GLOBAL", ["sds_document", "formula_document"], 0.8))
-        if self._has_cross_file_identity_conflict(parsed_sds, formula, process):
-            hits.append(self._rule_hit("cross_file_identity_conflict", "GLOBAL", ["sds_document", "formula_document"], 0.82))
         if not retrieved:
             hits.append(self._rule_hit("knowledge_no_match_review", "GLOBAL", ["knowledge_base"], 0.0))
         return hits
@@ -1822,25 +1945,6 @@ class ChemicalRagRunner:
                 0.78,
             )
         return self._agent_result("合规", ["storage_compatible"], ["未发现配方成分之间的演示禁忌储存组合。"], 0.9)
-
-    def _supplier_evidence_agent(
-        self,
-        case: dict[str, Any],
-        parsed_sds: Any,
-        formula: dict[str, Any],
-        process: dict[str, Any],
-    ) -> dict[str, Any]:
-        hit_rules = []
-        reasons = []
-        if self._has_supplier_evidence_conflict(case, parsed_sds, formula, process):
-            hit_rules.append("supplier_evidence_conflict")
-            reasons.append("供应商声明、检测报告或核心资料之间存在不一致，需要供应商澄清。")
-        if self._has_cross_file_identity_conflict(parsed_sds, formula, process):
-            hit_rules.append("cross_file_identity_conflict")
-            reasons.append("SDS 与配方表中的 CAS 或浓度信息存在冲突，需要重新确认物质身份。")
-        if hit_rules:
-            return self._agent_result("复核", hit_rules, reasons, 0.8)
-        return self._agent_result("合规", ["supplier_evidence_consistent"], ["供应商声明、检测报告与核心资料未发现明显冲突。"], 0.78)
 
     def _regulatory_agent(
         self,
@@ -1961,7 +2065,6 @@ class ChemicalRagRunner:
             "工艺": self._process_summary(process),
             "储运": f"储存条件：{self._storage_value(process, formula)}；UN 编号：{'、'.join(parsed_sds.metadata.get('un_numbers', [])) or '未提供/不适用'}。",
             "法规": f"目标市场法规初筛；CAS：{', '.join(component['cas'] for component in components) or '未抽取'}。",
-            "供应商证据": "供应商声明、检测报告、SDS 与配方表的一致性核对。",
         }
         branches = {}
         for agent_name, task in task_by_agent.items():
@@ -2104,15 +2207,20 @@ class ChemicalRagRunner:
         unknown = [component for component in components if not component["known"]]
         hard_stop_rules = [hit["rule_id"] for hit in rule_hits if hit["rule_id"] in HARD_STOP_RULES]
         review_rules = [hit["rule_id"] for hit in rule_hits if hit["rule_id"] in REVIEW_RULES]
+        rule_names = lambda rules: "、".join(self._rule_label(rule) for rule in sorted(set(rules)))
         if missing:
             reasons.append(f"缺少关键资料或字段：{'、'.join(missing)}。")
         if unknown:
             reasons.append(f"未知物质或知识库无命中：{', '.join(component['cas'] for component in unknown)}。")
+        absolute_stops = [rule for rule in hard_stop_rules if rule in ABSOLUTE_HARD_STOP_RULES]
+        if absolute_stops:
+            reasons.append(f"触发直接阻断项：{rule_names(absolute_stops)}。")
+            return {"verdict": "不合规", "reasons": reasons, "needs_human": False}
         if hard_stop_rules and not missing and not unknown:
-            reasons.append(f"命中禁忌/硬性拦截规则：{'、'.join(sorted(set(hard_stop_rules)))}。")
+            reasons.append(f"触发准入红线或禁忌组合：{rule_names(hard_stop_rules)}。")
             return {"verdict": "不合规", "reasons": reasons, "needs_human": False}
         if review_rules and not missing and not unknown:
-            reasons.append(f"命中复核规则：{'、'.join(sorted(set(review_rules)))}。")
+            reasons.append(f"需专项复核项：{rule_names(review_rules)}。")
         if missing or unknown or review_rules or any(result["verdict"] == "复核" for result in sub_agent_results.values()):
             if not reasons:
                 reasons.append("子 Agent 存在复核结论，主审保守输出复核。")
@@ -2206,13 +2314,12 @@ class ChemicalRagRunner:
             "enterprise_redline_benzene": "企业内部化工准入红线演示规则",
             "flammable_storage_missing": "企业储运兼容性演示规则",
             "transport_un_mismatch": "企业储运兼容性演示规则",
-            "supplier_evidence_conflict": "企业供应商证据一致性演示规则",
-            "cross_file_identity_conflict": "企业供应商证据一致性演示规则",
             "oxidizer_high_temperature_process": "企业氧化剂工艺安全演示规则",
             "hazardous_catalog_match": "中国危险化学品目录演示摘录",
             "svhc_threshold_match": "ECHA REACH/SVHC 演示摘录",
             "tsca_inventory_match": "EPA TSCA 与 OSHA HCS 演示摘录",
             "source_backed_no_restricted_demo_match": "EPA TSCA 与 OSHA HCS 演示摘录",
+            "voc_limit_exceeded": "企业内部化工准入红线演示规则",
         }
         title = preferred.get(rule_id)
         for source in pack["sources"]:
@@ -2329,8 +2436,8 @@ class ChemicalRagRunner:
             supplement_actions=supplement_actions,
             risk_items=risk_items,
             evidence_chain=evidence_chain,
-            source_documents=source_documents,
             package_precheck=package_precheck,
+            source_documents=source_documents,
             run_id=run_id,
             generated_at=generated_at,
         )
@@ -2402,7 +2509,7 @@ class ChemicalRagRunner:
             {
                 "field": gap["field"],
                 "action": f"补充或确认：{gap['label']}",
-                "owner": "供应商/EHS/法规复核人",
+                "owner": "供应商/环境健康安全/法规复核人",
                 "reason": gap["impact"],
                 "required_before_release": True,
             }
@@ -2411,11 +2518,11 @@ class ChemicalRagRunner:
 
     def _gap_impact(self, field: str) -> str:
         impacts = {
-            "sds_sections": "SDS 结构不完整，无法支撑后续危害、储运和法规证据链。",
+            "sds_sections": "安全技术说明书结构不完整，无法支撑后续危害、储运和法规证据链。",
             "supplier": "供应商身份缺失，无法建立准入责任边界。",
             "revision_date": "SDS 版本有效性不明，法规和危害信息可能过期。",
-            "cas_numbers": "CAS 缺失，无法完成物质主数据、法规清单和禁忌矩阵匹配。",
-            "component_concentrations": "浓度缺失，无法判断 SVHC 阈值、危害分类和混配风险。",
+            "cas_numbers": "成分登记号缺失，无法完成物质主数据、法规清单和禁忌矩阵匹配。",
+            "component_concentrations": "浓度缺失，无法判断高度关注物质阈值、危害分类和混配风险。",
             "process_temperature": "工艺温度缺失，无法判断氧化剂分解、高温和挥发风险。",
             "process_pressure": "工艺压力缺失，无法判断工艺安全边界。",
             "process_steps": "关键步骤缺失，无法确认是否同釜混配、同槽使用或存在禁忌操作。",
@@ -2447,8 +2554,8 @@ class ChemicalRagRunner:
         supplement_actions: list[dict[str, Any]],
         risk_items: list[dict[str, Any]],
         evidence_chain: list[dict[str, Any]],
-        source_documents: list[dict[str, Any]] | None = None,
         package_precheck: dict[str, Any] | None = None,
+        source_documents: list[dict[str, Any]] | None = None,
         run_id: str | None = None,
         generated_at: str | None = None,
     ) -> dict[str, Any]:
@@ -2466,6 +2573,8 @@ class ChemicalRagRunner:
                     continue
                 seen.add(key)
                 action = next((item for item in combined_supplement_actions if item["field"] == gap["field"]), None)
+                gap_label = self._display_text(gap["label"])
+                gap_evidence = self._display_text(gap.get("evidence") or "用户资料未提供该字段。")
                 grouped["intake_readiness"].append(
                     {
                         "id": f"I-{counter:03d}",
@@ -2475,22 +2584,22 @@ class ChemicalRagRunner:
                         "severity": "blocking",
                         "category": "intake_readiness",
                         "category_label": CHECK_TYPE_LABELS["intake_readiness"],
-                        "reason": f"{gap['label']}缺失或无法确认。",
+                        "reason": f"{gap_label}缺失或无法确认。",
                         "rule_id": "document_completeness_precheck",
-                        "rule_text": f"资料预检要求提供可支撑审查的{gap['label']}，否则不能直接形成准入结论。",
+                        "rule_text": f"准入要求：资料预检要求提供可支撑审查的{gap_label}。执行要求：该字段缺失或无法确认时，先补齐资料，不直接形成准入结论。",
                         "rule": {
                             "id": "document_completeness_precheck",
-                            "text": f"资料预检要求提供可支撑审查的{gap['label']}，否则不能直接形成准入结论。",
+                            "text": f"准入要求：资料预检要求提供可支撑审查的{gap_label}。执行要求：该字段缺失或无法确认时，先补齐资料，不直接形成准入结论。",
                             "source": "资料完整性预检",
                         },
-                        "user_text": gap.get("evidence") or "用户资料未提供该字段。",
+                        "user_text": gap_evidence,
                         "source": {
                             "type": "uploaded_package",
-                            "text": gap.get("evidence") or "用户资料未提供该字段。",
+                            "text": gap_evidence,
                             "document_type": gap.get("source", "资料包"),
                         },
-                        "impact": gap["impact"],
-                        "recommendation": self._customer_action_text(action) if action else f"请供应商补充或确认：{gap['label']}",
+                        "impact": self._display_text(gap["impact"]),
+                        "recommendation": self._display_text(self._customer_action_text(action) if action else f"请供应商补充或确认：{gap_label}"),
                         "requires_human_review": True,
                     }
                 )
@@ -2501,6 +2610,7 @@ class ChemicalRagRunner:
                 if key in seen:
                     continue
                 seen.add(key)
+                action_reason = self._display_text(action.get("reason", "资料包预检识别到资料缺口。"))
                 grouped["intake_readiness"].append(
                     {
                         "id": f"I-{counter:03d}",
@@ -2510,26 +2620,27 @@ class ChemicalRagRunner:
                         "severity": "blocking",
                         "category": "intake_readiness",
                         "category_label": CHECK_TYPE_LABELS["intake_readiness"],
-                        "reason": self._customer_action_text(action),
+                        "reason": self._display_text(self._customer_action_text(action)),
                         "rule_id": "package_precheck",
-                        "rule_text": "资料包预检要求先确认文件可读、资料类型清楚，并补齐支撑所选检查项的关键资料。",
+                        "rule_text": "准入要求：资料包预检要求先确认文件可读、资料类型清楚，并覆盖所选检查项的关键资料。执行要求：关键资料缺失时，先补齐资料后重新预检。",
                         "rule": {
                             "id": "package_precheck",
-                            "text": "资料包预检要求先确认文件可读、资料类型清楚，并补齐支撑所选检查项的关键资料。",
+                            "text": "准入要求：资料包预检要求先确认文件可读、资料类型清楚，并覆盖所选检查项的关键资料。执行要求：关键资料缺失时，先补齐资料后重新预检。",
                             "source": "资料包预检",
                         },
-                        "user_text": action.get("reason", "资料包预检识别到资料缺口。"),
+                        "user_text": action_reason,
                         "source": {
                             "type": "package_precheck",
-                            "text": action.get("reason", "资料包预检识别到资料缺口。"),
+                            "text": action_reason,
                             "document_type": action.get("field", "资料包"),
                         },
-                        "impact": action.get("reason", "该缺口会影响审查可靠性。"),
-                        "recommendation": self._customer_action_text(action),
+                        "impact": self._display_text(action.get("reason", "该缺口会影响审查可靠性。")),
+                        "recommendation": self._display_text(self._customer_action_text(action)),
                         "requires_human_review": True,
                     }
                 )
                 counter += 1
+        rule_meta_index = self._rule_meta_index()
         for item in risk_items:
             if item["verdict"] == "合规":
                 continue
@@ -2539,16 +2650,25 @@ class ChemicalRagRunner:
             rule_id = item["rule_refs"][0] if item.get("rule_refs") else "manual_review"
             if self._is_positive_rule(rule_id):
                 continue
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain, source_documents, rule_id)
-            key = (check_type, rule_id)
+            rule_meta = rule_meta_index.get(rule_id, {})
+            user_text = self._customer_user_text(
+                item.get("evidence_refs", []),
+                evidence_chain,
+                rule_meta=rule_meta,
+                source_documents=source_documents,
+            )
+            user_text = self._display_text(user_text)
+            key = (check_type, rule_id, user_text)
             if key in seen:
                 continue
             seen.add(key)
             issue_id = f"I-{counter:03d}"
             status = self._customer_issue_status(item["verdict"])
             rule_text = self._customer_rule_text(rule_id)
-            user_text = self._customer_user_text(item.get("evidence_refs", []), evidence_chain, source_documents, rule_id)
             check_label = CHECK_TYPE_LABELS[check_type]
+            rule_name_zh = self._display_text(rule_meta.get("rule_name_zh") or self._rule_label(rule_id))
+            regulation_ref = rule_meta.get("regulation_ref") or ""
+            regulation_excerpt = rule_meta.get("regulation_excerpt") or rule_text
             grouped[check_type].append(
                 {
                     "id": issue_id,
@@ -2558,22 +2678,30 @@ class ChemicalRagRunner:
                     "severity": item.get("severity", self._severity_for_verdict(item["verdict"])),
                     "category": check_type,
                     "category_label": check_label,
-                    "reason": self._customer_issue_reason(rule_id, item["reason"]),
+                    "reason": self._display_text(self._customer_issue_reason(rule_id, item["reason"])),
                     "rule_id": rule_id,
+                    "violated_rule_id": rule_id,
+                    "rule_name_zh": rule_name_zh,
+                    "regulation_ref": regulation_ref,
+                    "regulation_excerpt": regulation_excerpt,
                     "rule_text": rule_text,
                     "rule": {
                         "id": rule_id,
                         "text": rule_text,
+                        "name_zh": rule_name_zh,
+                        "regulation_ref": regulation_ref,
+                        "regulation_excerpt": regulation_excerpt,
                         "source": "法规/企业规则知识库" if rule_id != "manual_review" else "人工复核策略",
                     },
                     "user_text": user_text,
+                    "user_quote": user_text,
                     "source": {
                         "type": "uploaded_document",
                         "text": user_text,
                         "evidence_refs": item.get("evidence_refs", []),
                     },
-                    "impact": self._customer_issue_impact(item["verdict"], rule_id),
-                    "recommendation": item["recommended_action"],
+                    "impact": self._display_text(self._customer_issue_impact(item["verdict"], rule_id)),
+                    "recommendation": self._display_text(item["recommended_action"]),
                     "requires_human_review": bool(item.get("requires_human_review", status != "not_approved")),
                 }
             )
@@ -2655,13 +2783,13 @@ class ChemicalRagRunner:
             "next_actions": self._customer_next_actions(customer_verdict, combined_supplement_actions),
             "evidence_policy": {
                 "customer_report_includes": ["规则编号", "规则原文", "用户资料原文/识别结果", "影响说明", "整改或补件建议"],
-                "customer_report_excludes": ["检索切片明细", "内部排序分数", "智能体分支原始输出", "执行链路调试 JSON"],
-                "admin_evidence_location": "管理端技术证据区",
+                "customer_report_excludes": ["RAG chunks", "rerank 分数", "agent 分支原始输出", "trace 节点 JSON"],
+                "admin_evidence_location": "technical_trace / retrieval / agent_branches",
             },
             "limitations": self._customer_limitations(package_precheck, customer_verdict),
             "technical_reference": {
-                "admin_evidence_available": True,
-                "admin_evidence_sections": ["管理端技术证据", "检索证据", "智能体分支", "执行链路"],
+                "admin_trace_available": True,
+                "trace_fields": ["technical_trace", "retrieval", "agent_branches", "trace"],
                 "run_id": run_id,
             },
             "disclaimer": "本结果为 AI 辅助合规预审，不替代最终法规、法律或 EHS 审批意见。",
@@ -2761,7 +2889,7 @@ class ChemicalRagRunner:
         issue_groups: list[dict[str, Any]],
     ) -> str:
         issue_count = sum(len(group["items"]) for group in issue_groups)
-        markets = "、".join(case.get("target_markets", [])) or "未指定"
+        markets = "、".join(self._market_label(item) for item in case.get("target_markets", [])) or "未指定"
         if customer_verdict == "pass":
             return f"{case['title']}面向{markets}的预审未发现需要客户立即处理的不合格或复核事项。"
         if customer_verdict == "needs_supplement":
@@ -2777,8 +2905,17 @@ class ChemicalRagRunner:
         if verdict == "not_approved":
             return ["暂停当前物料准入，要求供应商调整配方、工艺或储运方案后重新提交。"]
         if verdict == "needs_review":
-            return ["提交 EHS/法规负责人复核，并补充必要的供应商声明或测试依据。"]
+            return ["提交环境健康安全/法规负责人复核，并补充必要的供应商声明或测试依据。"]
         return ["进入企业内部准入审批或小范围试用流程。"]
+
+    def _market_label(self, market: str) -> str:
+        return {
+            "CN": "中国",
+            "EU": "欧盟",
+            "US": "美国",
+            "KR": "韩国",
+            "JP": "日本",
+        }.get(str(market or ""), str(market or ""))
 
     def _check_type_for_risk_item(self, item: dict[str, Any]) -> str:
         rule_id = item["rule_refs"][0] if item.get("rule_refs") else ""
@@ -2790,25 +2927,43 @@ class ChemicalRagRunner:
             return "process_fit"
         if rule_id in {"hazardous_catalog_match", "svhc_threshold_match", "tsca_inventory_match", "knowledge_no_match_review"}:
             return "regulatory_screening"
-        if rule_id in {"supplier_evidence_conflict", "cross_file_identity_conflict"}:
-            return "supplier_evidence_consistency"
         if rule_id in {"unknown_substance_review", "enterprise_redline_benzene"}:
             return "restricted_substance"
         return "ingredient_identity"
 
     def _customer_rule_text(self, rule_id: str) -> str:
-        if rule_id == "manual_review":
-            return "系统未能形成自动放行结论时，应进入人工复核。"
-        source = self._source_for_rule(rule_id)
-        return self._snippet_for_rule(rule_id, source["content"])
+        texts = {
+            "manual_review": "准入要求：当前资料必须足以支持系统形成明确结论。执行要求：资料不足或结论边界不清时，转人工复核后再决定是否进入下一环节。",
+            "document_completeness_precheck": "准入要求：资料包必须达到可审查状态，文件可读、类型明确且覆盖所选审查范围。执行要求：文件不可读、类型不清或关键资料缺失时，先补齐资料，不进入正式准入判断。",
+            "package_precheck": "准入要求：资料包应先完成可读性、资料类型和关键证据覆盖检查。执行要求：未覆盖所选审查范围时，退回补件后重新预检。",
+            "sds_missing_sections": "准入要求：安全技术说明书应包含法规要求的关键章节，且章节内容可用于危害、储运和应急判断。执行要求：关键章节缺失或内容为空时，不作为完整准入依据，要求供应商补充有效版本。",
+            "formula_components_missing": "准入要求：配方资料应提供组分名称、登记号及浓度或浓度范围，保密成分也需提供可审查的合规声明。执行要求：成分身份或浓度缺失时，不进入自动放行，要求供应商补齐可核验资料。",
+            "process_parameters_missing": "准入要求：工艺资料应明确温度、压力、转速、关键步骤及必要安全控制条件。执行要求：关键工艺参数缺失时，先补充工艺说明或由工艺安全负责人确认。",
+            "knowledge_no_match_review": "准入要求：目标市场结论应有可追溯法规或企业规则证据支持。执行要求：知识库未形成有效命中时，不自动放行，转法规人员复核。",
+            "knowledge_pack_missing_review": "准入要求：审查必须基于已加载且版本明确的规则库资料。执行要求：知识库缺失或证据不足时，仅形成保守复核结论。",
+            "incompatibility_oxidizer_flammable": "准入要求：可燃液体不得与氧化剂在同一配方、同一工艺步骤或同一不兼容储存单元中混配、共用或共存。执行要求：命中该组合时暂停当前方案，要求供应商拆分工艺、调整配方或提供经批准的隔离控制方案。",
+            "incompatibility_hypochlorite_acid": "准入要求：次氯酸盐不得与盐酸等酸类同槽、同釜或同步骤接触。执行要求：存在释放氯气或放热失控风险时，直接阻断当前方案，供应商需调整配方/工艺后重新提交。",
+            "hazardous_catalog_match": "准入要求：命中危险化学品目录的物质，需确认经营许可、储存条件、运输资质和企业适用边界。执行要求：许可或控制条件未确认前，不进入采购准入放行。",
+            "tsca_inventory_match": "准入要求：面向美国市场时，应确认物质清单状态、用途边界和标签/安全技术说明书义务。执行要求：清单状态或用途边界未确认前，转法规负责人复核。",
+            "svhc_threshold_match": "准入要求：含欧盟高度关注物质或处于阈值边界时，应具备供应商证明、客户披露义务判断和用途边界说明。执行要求：证明或披露判断缺失时，不建议直接准入。",
+            "ghs_label_pictogram_missing": "准入要求：危险品标签应包含产品标识、信号词、象形图、危害/防范说明和供应商信息。执行要求：任一关键标签要素缺失时，要求供应商修订标签后再审。",
+            "flammable_storage_missing": "准入要求：含可燃液体时，储运资料需明确防火隔离、通风、防爆电气和储存温度等控制条件。执行要求：控制条件缺失时，不进入仓储或现场试用。",
+            "oxidizer_high_temperature_process": "准入要求：氧化剂涉及加热、高温或热源工艺时，应提供稳定性、冷却联锁、泄压和工艺安全确认。执行要求：工艺安全确认缺失时，转工艺安全负责人复核。",
+            "transport_un_mismatch": "准入要求：运输编号应与物料危险类别和安全技术说明书第 2/14 章一致。执行要求：运输分类明显不一致时，要求供应商重新出具运输分类依据。",
+            "enterprise_redline_benzene": "准入要求：命中企业红线物质时，当前物料或配方不得进入新供应商准入流程。执行要求：除非完成企业例外审批，否则直接阻断。",
+            "voc_limit_exceeded": "准入要求：挥发性有机物检测值不得超过目标市场或企业限值。执行要求：超限时当前配方不得按该用途准入，需调整配方并重新检测。",
+            "sds_revision_outdated": "准入要求：安全技术说明书版本应有效、日期可追溯，并能代表当前配方。执行要求：版本过旧或不可追溯时，要求供应商提供有效版本后再审查。",
+            "unknown_substance_review": "准入要求：组分身份应可核验并纳入企业物质主数据或可审查的替代证明。执行要求：未知物质或身份无法确认时，不自动放行。",
+        }
+        return texts.get(rule_id, f"准入要求：{self._rule_label(rule_id)}需符合目标市场法规、企业准入标准和供应商证据要求。执行要求：证据不足或边界不清时，转法规负责人复核后再决定是否准入。")
 
     def _customer_issue_reason(self, rule_id: str, fallback: str) -> str:
         reasons = {
-            "sds_complete": "SDS 结构可读取，但仍需结合配方、工艺和所选市场完成审查。",
-            "sds_missing_sections": "SDS 章节不完整，资料不能支撑完整合规预审。",
-            "formula_components_missing": "配方或 SDS 未提供足够的成分、CAS 或浓度信息。",
+            "sds_complete": "安全技术说明书结构可读取，但仍需结合配方、工艺和所选市场完成审查。",
+            "sds_missing_sections": "安全技术说明书章节不完整，资料不能支撑完整合规预审。",
+            "formula_components_missing": "配方或安全技术说明书未提供足够的成分、登记号或浓度信息。",
             "process_parameters_missing": "工艺温度、压力或关键步骤信息不足。",
-            "unknown_substance_review": "存在未知 CAS 或未进入物质主数据的成分。",
+            "unknown_substance_review": "存在未知登记号或未进入物质主数据的成分。",
             "knowledge_no_match_review": "知识库未能为部分物质或法规方向提供充分命中证据。",
             "knowledge_pack_missing_review": "知识库未加载，不能形成证据充分的预审结论。",
             "incompatibility_oxidizer_flammable": "资料显示可燃液体与氧化剂存在同配方、同使用或同储风险。",
@@ -2817,95 +2972,103 @@ class ChemicalRagRunner:
             "flammable_storage_missing": "含可燃组分但储存隔离、防火或通风条件不足。",
             "oxidizer_high_temperature_process": "氧化剂涉及高温或不明确工艺条件，需要工艺安全复核。",
             "transport_un_mismatch": "运输信息与物质风险不一致或不足。",
-            "supplier_evidence_conflict": "供应商声明、检测报告或配方资料存在不一致。",
-            "cross_file_identity_conflict": "SDS 与配方表中的 CAS 或浓度信息不一致。",
             "hazardous_catalog_match": "物质存在危化品目录命中信号，需要结合法规和用途复核。",
-            "svhc_threshold_match": "物质存在 SVHC 阈值相关风险，需要补充 REACH/SVHC 证明。",
-            "tsca_inventory_match": "物质涉及 TSCA 清单核验，需要确认美国市场状态。",
+            "svhc_threshold_match": "物质存在欧盟高度关注物质阈值相关风险，需要补充供应商证明。",
+            "tsca_inventory_match": "物质涉及美国化学品清单核验，需要确认美国市场状态。",
         }
         return reasons.get(rule_id, fallback.removeprefix(f"命中规则 {rule_id}："))
+
+    def _rule_label(self, rule_id: str) -> str:
+        return RULE_NAME_ZH_FALLBACK.get(rule_id, rule_id)
+
+    def _display_text(self, text: str) -> str:
+        out = str(text or "")
+        for pattern, replacement in DISPLAY_LABEL_REPLACEMENTS:
+            out = pattern.sub(replacement, out)
+        return out
 
     def _customer_user_text(
         self,
         evidence_refs: list[str],
         evidence_chain: list[dict[str, Any]],
+        *,
+        rule_meta: dict[str, Any] | None = None,
         source_documents: list[dict[str, Any]] | None = None,
-        rule_id: str | None = None,
     ) -> str:
+        """Resolve the user_quote / user_text snippet shown to customers.
+
+        Priority order:
+
+        1. If we have access to source documents and the rule pack provides
+           ``expected_user_quote_keywords``, search each user document for any
+           keyword and return an ~80-character window around the first hit.
+        2. If keywords are absent or none match but at least one source doc is
+           plausibly the source of this finding, return its first ~200 chars
+           (real document content, never a metadata summary).
+        3. Otherwise fall back to evidence_chain entries that look like real
+           document content (snippet does not look like a metadata digest).
+        4. Last resort: the legacy metadata snippet — should be reached only
+           for purely structural checks with no associated user document.
+        """
+        keywords = []
+        if rule_meta:
+            raw_keywords = rule_meta.get("expected_user_quote_keywords") or []
+            keywords = [str(kw) for kw in raw_keywords if str(kw).strip()]
+
+        # 1+2: try real source documents.
+        if source_documents:
+            doc_texts: list[str] = []
+            for doc in source_documents:
+                content = str(doc.get("content") or "").strip()
+                if content:
+                    doc_texts.append(content)
+            for keyword in keywords:
+                for text in doc_texts:
+                    position = text.find(keyword)
+                    if position < 0:
+                        continue
+                    start = max(0, position - 80)
+                    end = min(len(text), position + len(keyword) + 80)
+                    return text[start:end].strip()
+            # No keyword hit: still prefer real document content over metadata.
+            if doc_texts:
+                first = doc_texts[0]
+                return first[:200].strip()
+
+        # 3: evidence_chain — but skip entries whose snippets look like
+        # metadata digests (e.g. "SDS 章节数 16；缺失字段 [...]。",
+        # "配方表抽取成分 N 个。", "工艺字段：{...}").
         refs = set(evidence_refs)
-        source_quote = self._customer_source_quote(refs, source_documents or [], rule_id)
-        if source_quote:
-            return source_quote
+
+        def _looks_like_metadata(snippet: str) -> bool:
+            return (
+                "章节数" in snippet
+                or snippet.startswith("配方表抽取成分")
+                or snippet.startswith("工艺字段：")
+                or "缺失字段" in snippet
+            )
+
         for evidence in evidence_chain:
             if evidence["ref"] in refs and evidence["type"] == "资料":
-                return evidence["snippet"]
+                snippet = evidence["snippet"]
+                if not _looks_like_metadata(snippet):
+                    return snippet
         for evidence in evidence_chain:
             if evidence["ref"] in refs:
-                return evidence["snippet"]
+                snippet = evidence["snippet"]
+                if not _looks_like_metadata(snippet):
+                    return snippet
+        # 4: last-resort fallback (structural checks without any doc context).
+        if evidence_chain:
+            return evidence_chain[0]["snippet"]
         return "用户资料未提供可直接引用的原文。"
-
-    def _customer_source_quote(
-        self,
-        evidence_refs: set[str],
-        source_documents: list[dict[str, Any]],
-        rule_id: str | None,
-    ) -> str:
-        if not source_documents:
-            return ""
-        ref_to_type = {
-            "sds_document": "SDS",
-            "formula_document": "配方表",
-            "process_document": "工艺资料",
-        }
-        requested_types = {ref_to_type[ref] for ref in evidence_refs if ref in ref_to_type}
-        if not requested_types:
-            return ""
-        quote_parts = []
-        for document in source_documents:
-            if document.get("type") not in requested_types:
-                continue
-            lines = self._customer_relevant_source_lines(str(document.get("content", "")), rule_id)
-            if lines:
-                quote_parts.append(f"{document.get('type')}：{'；'.join(lines)}")
-        return " | ".join(quote_parts)
-
-    def _customer_relevant_source_lines(self, text: str, rule_id: str | None) -> list[str]:
-        lines = [line.strip(" -\t") for line in text.splitlines() if line.strip()]
-        if not lines:
-            return []
-        keyword_groups = {
-            "incompatibility_oxidizer_flammable": [
-                "乙醇",
-                "过氧化氢",
-                "可燃",
-                "氧化",
-                "同釜",
-                "同一反应釜",
-                "同一混配单元",
-                "同储",
-            ],
-            "incompatibility_hypochlorite_acid": ["次氯酸钠", "盐酸", "酸", "氯气", "同釜", "同槽", "同储"],
-            "enterprise_redline_benzene": ["苯", "企业红线", "红线"],
-            "flammable_storage_missing": ["储存", "防火", "通风", "防爆", "可燃"],
-            "transport_un_mismatch": ["运输", "UN", "易燃液体"],
-            "oxidizer_high_temperature_process": ["温度", "高温", "过氧化氢", "氧化", "加热"],
-            "supplier_evidence_conflict": ["供应商声明", "检测报告", "符合性声明", "不一致"],
-            "cross_file_identity_conflict": ["CAS", "浓度", "成分", "配方"],
-            "hazardous_catalog_match": ["危化", "危险化学品", "法规"],
-            "svhc_threshold_match": ["SVHC", "REACH", "双酚", "0.1"],
-        }
-        keywords = keyword_groups.get(rule_id or "", ["CAS", "浓度", "储存", "运输", "工艺", "关键步骤"])
-        matched = [line for line in lines if any(keyword in line for keyword in keywords)]
-        return matched[:4] or lines[:2]
 
     def _customer_issue_impact(self, verdict: str, rule_id: str) -> str:
         if verdict == "不合规":
             return "该事项触发硬性拦截或企业红线，当前资料不支持直接准入。"
         if rule_id in {"sds_missing_sections", "formula_components_missing", "process_parameters_missing", "knowledge_pack_missing_review"}:
             return "资料基础不足，系统不能形成证据充分的自动放行意见。"
-        if rule_id in {"supplier_evidence_conflict", "cross_file_identity_conflict"}:
-            return "客户资料之间存在冲突，必须由供应商澄清后才能进入正式准入判断。"
-        return "该事项存在不确定性，需要 EHS/法规人员结合业务场景确认。"
+        return "该事项存在不确定性，需要环境健康安全/法规人员结合业务场景确认。"
 
     def _review_checklist(
         self,
@@ -2919,16 +3082,16 @@ class ChemicalRagRunner:
         cas_values = [component["cas"] for component in components]
         concentration_values = [component["concentration_text"] for component in components]
         return [
-            self._check_item("sds_sections", "SDS 16 章节", f"{section_count}/16", section_complete, "SDS"),
-            self._check_item("supplier", "供应商", parsed_sds.extracted_fields.get("supplier") or "未提供", bool(parsed_sds.extracted_fields.get("supplier")), "SDS"),
-            self._check_item("revision_date", "SDS 修订日期", parsed_sds.extracted_fields.get("revision_date") or "未提供", "revision_date" not in parsed_sds.missing_fields, "SDS"),
-            self._check_item("cas_numbers", "CAS 识别", "、".join(cas_values) if cas_values else "未抽取", bool(cas_values), "配方表/SDS"),
+            self._check_item("sds_sections", "安全技术说明书 16 章节", f"{section_count}/16", section_complete, "安全技术说明书"),
+            self._check_item("supplier", "供应商", parsed_sds.extracted_fields.get("supplier") or "未提供", bool(parsed_sds.extracted_fields.get("supplier")), "安全技术说明书"),
+            self._check_item("revision_date", "安全技术说明书修订日期", parsed_sds.extracted_fields.get("revision_date") or "未提供", "revision_date" not in parsed_sds.missing_fields, "安全技术说明书"),
+            self._check_item("cas_numbers", "成分登记号识别", "、".join(cas_values) if cas_values else "未抽取", bool(cas_values), "配方表/安全技术说明书"),
             self._check_item("component_concentrations", "成分浓度", "、".join(concentration_values) if concentration_values else "未抽取", bool(concentration_values) and not formula.get("missing_fields"), "配方表"),
             self._check_item("process_temperature", "工艺温度", process["fields"].get("温度", "未提供"), "温度" not in process["missing_fields"], "工艺资料"),
             self._check_item("process_pressure", "工艺压力", process["fields"].get("压力", "未提供"), "压力" not in process["missing_fields"], "工艺资料"),
             self._check_item("process_steps", "工艺关键步骤", process["fields"].get("关键步骤", "未提供"), "关键步骤" not in process["missing_fields"], "工艺资料"),
-            self._check_item("un_numbers", "UN 编号", "、".join(parsed_sds.metadata.get("un_numbers", [])) or "未提供/不适用", True, "SDS"),
-            self._check_item("storage_condition", "储存条件", self._storage_value(process, formula), self._storage_value(process, formula) != "未提供", "SDS/配方/工艺"),
+            self._check_item("un_numbers", "运输编号", "、".join(parsed_sds.metadata.get("un_numbers", [])) or "未提供/不适用", True, "安全技术说明书"),
+            self._check_item("storage_condition", "储存条件", self._storage_value(process, formula, parsed_sds), self._storage_value(process, formula, parsed_sds) != "未提供", "安全技术说明书/配方/工艺"),
         ]
 
     def _check_item(self, field: str, label: str, value: object, is_present: bool, source: str) -> dict[str, Any]:
@@ -2940,13 +3103,30 @@ class ChemicalRagRunner:
             "source": source,
         }
 
-    def _storage_value(self, process: dict[str, Any], formula: dict[str, Any]) -> str:
+    def _storage_value(self, process: dict[str, Any], formula: dict[str, Any], parsed_sds: Any | None = None) -> str:
         value = process["fields"].get("储存条件") or process["fields"].get("储存类别")
         if value:
             return value
-        for line in formula.get("text", "").splitlines():
-            if line.strip().startswith("储存类别"):
-                return line.split("：", 1)[-1].strip() if "：" in line else line.strip()
+        for source_text in (formula.get("text", ""), process.get("text", "")):
+            for line in source_text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith(("储存条件", "储存类别", "储运条件")):
+                    if "：" in stripped or ":" in stripped:
+                        return re.split(r"[：:]", stripped, maxsplit=1)[-1].strip()
+                    return stripped
+        if parsed_sds is not None:
+            for section in getattr(parsed_sds, "sections", []):
+                if section.number != 7:
+                    continue
+                for line in section.content.splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith(("储存条件", "储存类别", "储运条件", "储存：", "储存:")):
+                        if "：" in stripped or ":" in stripped:
+                            return re.split(r"[：:]", stripped, maxsplit=1)[-1].strip()
+                        return stripped
+                if section.content.strip():
+                    snippet = section.content.strip().splitlines()[0][:80]
+                    return f"SDS 第 7 章：{snippet}"
         return "未提供"
 
     def _review_risk_items(
@@ -2997,8 +3177,8 @@ class ChemicalRagRunner:
 
     def _risk_reason(self, rule_id: str, snippet: str) -> str:
         labels = {
-            "sds_complete": "SDS 结构完整，作为资料完整性正向证据。",
-            "formula_components_known": "配方成分可识别，CAS 与浓度已进入审查。",
+            "sds_complete": "安全技术说明书结构完整，作为资料完整性正向证据。",
+            "formula_components_known": "配方成分可识别，登记号与浓度已进入审查。",
             "process_parameters_present": "工艺温度、压力和关键步骤已披露。",
             "storage_compatible": "未发现当前配方成分之间的演示禁忌储存组合。",
             "source_backed_no_restricted_demo_match": "RAG 已召回版本化证据，未命中禁限用演示规则。",
@@ -3006,7 +3186,7 @@ class ChemicalRagRunner:
         }
         if rule_id in labels:
             return labels[rule_id]
-        return f"命中规则 {rule_id}：{snippet}"
+        return self._customer_rule_text(rule_id)
 
     def _review_report_summary(
         self,
@@ -3022,13 +3202,13 @@ class ChemicalRagRunner:
             major = ["未命中红线或禁限用演示规则，但仍需人工最终确认。"]
         supplement = [f"补充或确认：{label}" for label in missing]
         return {
-            "case_summary": f"{case['title']}；目标市场：{'、'.join(case['target_markets'])}；系统预审结论：{chief['verdict']}。",
+            "case_summary": f"{case['title']}；目标市场：{'、'.join(self._market_label(item) for item in case['target_markets'])}；系统预审结论：{chief['verdict']}。",
             "material_completeness": "资料完整" if not missing else f"存在资料缺口：{'、'.join(missing)}。",
             "major_risks": major[:6],
             "evidence_sources": [item["source_url"] or item["ref"] for item in evidence_chain[:8]],
             "supplement_requests": supplement,
-            "human_review_status": "无需系统强制复核，但仍需人工最终确认。" if not chief["needs_human"] else "需要 EHS/法规人员复核后形成最终意见。",
-            "disclaimer": "本结果为 AI 辅助预审，不构成最终法规、法律或 EHS 合规意见。",
+            "human_review_status": "无需系统强制复核，但仍需人工最终确认。" if not chief["needs_human"] else "需要环境健康安全/法规人员复核后形成最终意见。",
+            "disclaimer": "本结果为辅助预审，不构成最终法规、法律或环境健康安全合规意见。",
         }
 
     def _nodes(
@@ -3166,7 +3346,7 @@ class ChemicalRagRunner:
             return "可进入业务复核或小范围试运行放行流程。"
         if verdict == "不合规":
             return "停止当前配方准入，调整配方或储运方案后重新预审。"
-        return "补齐资料或由 EHS/法规人员确认后再形成最终意见。"
+        return "补齐资料或由环境健康安全/法规人员确认后再形成最终意见。"
 
     def _rule_hit(
         self,
@@ -3261,14 +3441,80 @@ class ChemicalRagRunner:
         has_oxidizer = any("oxidizer_demo" in component.get("tags", []) for component in components)
         return has_flammable and has_oxidizer
 
+    def _extract_voc_value(self, *texts: str) -> float | None:
+        """从 SDS / 配方 / 工艺文本里抽取 VOC g/L 值；返回最大命中值（更保守的阻断判断）。"""
+        best: float | None = None
+        for text in texts:
+            if not text:
+                continue
+            for match in VOC_VALUE_PATTERN.finditer(text):
+                try:
+                    value = float(match.group("value"))
+                except (TypeError, ValueError):
+                    continue
+                if best is None or value > best:
+                    best = value
+        return best
+
+    def _voc_limit_exceeded(self, *texts: str) -> bool:
+        """判断文档是否构成 VOC 超标硬阻断。
+
+        触发优先级（任一命中即视为超标）：
+        1) 文本里出现 "VOC <值> g/L 超 ... <limit> g/L" 显式声明，且 <值> > <limit>。
+        2) 文本中显式标注 ``voc_limit_exceeded`` 规则标识（demo 文档侧的强信号）。
+        3) 抽取到的最大 VOC 值大于最严类别兜底阈值（250 g/L）且文档包含"超 ... 限值"/"超过 ... 限值"短语。
+        """
+        for text in texts:
+            if not text:
+                continue
+            # 1) 显式 "VOC X g/L 超 ... limit g/L"
+            for match in VOC_EXCEEDANCE_PATTERN.finditer(text):
+                try:
+                    value = float(match.group("value"))
+                    limit = float(match.group("limit"))
+                except (TypeError, ValueError):
+                    continue
+                if value > limit:
+                    return True
+            # 2) 文档本身写出 voc_limit_exceeded（block 信号）
+            if VOC_RULE_ID_PATTERN.search(text):
+                return True
+        # 3) 兜底：>250 g/L 且文本含 "超 ... 限值" 邻近短语
+        voc_value = self._extract_voc_value(*texts)
+        if voc_value is None or voc_value <= VOC_HARD_STOP_LIMIT_GL:
+            return False
+        for text in texts:
+            if text and re.search(r"超(?:过|出)?[^符\n]{0,40}限值", text):
+                return True
+        return False
+
     def _looks_like_unresolved_formula_component(self, line: str) -> bool:
         clean = line.strip()
-        if not clean or not clean.startswith(("-", "*")):
+        if not clean:
             return False
-        if "CAS" in clean:
-            return False
-        has_concentration = bool(re.search(r"\d+(?:\.\d+)?\s*%", clean))
-        return has_concentration and any(keyword in clean for keyword in ["保密", "未披露", "未提供", "组分", "component"])
+        has_concentration = bool(re.search(r"\d+(?:\.\d+)?\s*%|\|\s*\d+(?:\.\d+)?\s*\|", clean))
+        if clean.startswith(("-", "*")):
+            if "CAS" in clean:
+                return False
+            return has_concentration and any(keyword in clean for keyword in ["保密", "未披露", "未提供", "组分", "component"])
+        if clean.startswith("|") and clean.endswith("|"):
+            cells = [c.strip() for c in clean.strip("|").split("|")]
+            if not has_concentration:
+                return False
+            if any(re.search(r"\b\d{2,7}-\d{2}-\d\b", cell) for cell in cells):
+                return False
+            if any(("见" in cell and ("SDS" in cell or "MSDS" in cell or "供应商" in cell or "随货" in cell)) for cell in cells):
+                return False
+            return any(
+                "未提供" in cell
+                or "待 NDA" in cell
+                or "未披露" in cell
+                or "内部代号" in cell
+                or "保密" in cell
+                or "CAS 未" in cell
+                for cell in cells
+            )
+        return False
 
     def _has_hypochlorite_acid_pair(self, components: list[dict[str, Any]]) -> bool:
         has_hypochlorite = any("hypochlorite_demo" in component.get("tags", []) for component in components)
@@ -3301,25 +3547,6 @@ class ChemicalRagRunner:
         has_flammable = any("flammable_demo" in component.get("tags", []) for component in components)
         has_ethanol_or_acetone = any(component["cas"] in {"64-17-5", "67-64-1"} for component in components)
         return has_flammable and has_ethanol_or_acetone
-
-    def _has_supplier_evidence_conflict(
-        self,
-        case: dict[str, Any],
-        parsed_sds: Any,
-        formula: dict[str, Any],
-        process: dict[str, Any],
-    ) -> bool:
-        text = " ".join([case.get("review_task", ""), process.get("text", ""), formula.get("text", "")]).lower()
-        cn_text = " ".join([case.get("review_task", ""), process.get("text", ""), formula.get("text", "")])
-        return any(keyword in text for keyword in ["conflict", "contradiction", "detected bpa"]) or any(keyword in cn_text for keyword in ["声明不含", "检测报告检出", "不一致", "冲突"])
-
-    def _has_cross_file_identity_conflict(self, parsed_sds: Any, formula: dict[str, Any], process: dict[str, Any]) -> bool:
-        text = " ".join([process.get("text", ""), formula.get("text", "")])
-        if any(keyword in text for keyword in ["跨文件冲突", "CAS/浓度冲突", "SDS 与配方表不一致", "浓度不一致"]):
-            return True
-        sds_cas = set(parsed_sds.metadata.get("cas_numbers", []))
-        formula_cas = {component["cas"] for component in formula.get("components", [])}
-        return bool(sds_cas and formula_cas and sds_cas.isdisjoint(formula_cas))
 
     def _is_sds_revision_outdated(self, parsed_sds: Any) -> bool:
         revision = parsed_sds.extracted_fields.get("revision_date")

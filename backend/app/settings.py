@@ -11,6 +11,22 @@ class Settings(BaseSettings):
     enable_llm: bool = Field(default=False, validation_alias=AliasChoices("RCR_ENABLE_LLM", "ENABLE_LLM"))
     openai_compatible_base_url: str | None = Field(default=None, validation_alias="OPENAI_API_BASE")
     openai_compatible_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    chem_rag_embedding_base_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CHEM_RAG_EMBEDDING_BASE_URL", "OPENAI_API_BASE"),
+    )
+    chem_rag_embedding_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CHEM_RAG_EMBEDDING_API_KEY", "OPENAI_API_KEY"),
+    )
+    chem_rag_llm_base_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CHEM_RAG_LLM_BASE_URL", "OPENAI_API_BASE"),
+    )
+    chem_rag_llm_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CHEM_RAG_LLM_API_KEY", "OPENAI_API_KEY"),
+    )
     chem_rag_embedding_provider: str = "qwen"
     chem_rag_embedding_model: str = "text-embedding-v4"
     chem_rag_embedding_dimensions: int = 1024

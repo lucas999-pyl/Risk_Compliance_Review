@@ -1,0 +1,88 @@
+<!-- report.html — 报告页 3 态共用骨架。
+     mount(outlet, params) 通过 fetch 注入，再用 JS 切换 hidden / class。 -->
+<div class="report-root" data-state="loading">
+
+  <!-- 加载态 -->
+  <div class="loading-state" data-slot="loading" style="padding:80px;color:var(--ink-48);">
+    正在加载报告……
+  </div>
+
+  <!-- 错误态 -->
+  <div class="err-state" data-slot="error" hidden>
+    <h1 data-slot="error-title">报告加载失败</h1>
+    <p data-slot="error-detail"></p>
+    <button class="cta-pearl" data-action="back-to-cases">返回 Case 看板</button>
+  </div>
+
+  <!-- 未生成态 (无 latest_report) -->
+  <div class="empty-state" data-slot="empty" hidden>
+    <h1 data-slot="empty-title">尚未生成审查报告</h1>
+    <p data-slot="empty-lead">本 Case 已建档但尚未运行预审。点击下方按钮启动一次完整的 AI 合规预审，结果会在此页持续展示。</p>
+    <div class="actions">
+      <button class="cta-primary lg" data-action="run-review">运行预审</button>
+      <a class="link" data-slot="continue-wizard" href="#">继续在 Wizard 中编辑 →</a>
+    </div>
+  </div>
+
+  <!-- 报告主体（默认 / 抽屉 / 待重跑 共用） -->
+  <div class="report-body" data-slot="body" hidden>
+
+    <div class="rpt-status">
+      <div class="h">
+        <div class="cap" data-slot="case-cap"></div>
+        <div class="ttl" data-slot="case-title"></div>
+      </div>
+      <div class="chips" data-slot="status-chips"></div>
+      <div class="actions">
+        <button class="cta-pearl" data-action="back-to-board">返回 Case 看板</button>
+        <button class="cta-primary" data-action="download-pdf">下载 PDF</button>
+        <button class="icon-btn" data-action="toggle-drawer" title="打开时间线抽屉">⌥</button>
+      </div>
+    </div>
+
+    <!-- 重跑进行中 subtask -->
+    <div class="runcard" data-slot="rerun-progress" hidden>
+      <div class="total">
+        <div class="t">重新运行预审中</div>
+        <div class="pct"><span class="spinner"></span></div>
+      </div>
+      <div class="bar"><i></i></div>
+      <div class="sub-h">子任务进度</div>
+      <div class="row"><span class="dot lg warn"></span><span class="n curr">AI 复核与规则引擎</span><span class="st warn">进行中…</span></div>
+    </div>
+
+    <!-- 主结论卡 -->
+    <div class="hero-card" data-slot="hero">
+      <div class="tag"><span class="dot lg" data-slot="hero-dot"></span><span data-slot="hero-tag">审查结论</span></div>
+      <h2 data-slot="hero-verdict"></h2>
+      <div class="lead" data-slot="hero-lead"></div>
+      <div class="foot" data-slot="hero-foot"></div>
+    </div>
+
+    <div class="findings-h" data-slot="findings-h"></div>
+    <div class="findings" data-slot="findings"></div>
+    <div class="findings-empty" data-slot="findings-empty" hidden>本次审查未发现需要客户立即处理的不合格或复核事项。</div>
+
+    <div class="rpt-footer">
+      <span data-slot="footer-left">报告由化工合规预审系统生成 · 仅供内部审查使用</span>
+      <span data-slot="footer-right"></span>
+    </div>
+
+    <!-- 抽屉 -->
+    <aside class="drawer" data-slot="drawer">
+      <div class="dhd">
+        <div class="t" data-slot="drawer-title">审查流程时间线</div>
+        <button class="x" data-action="close-drawer" aria-label="关闭">✕</button>
+      </div>
+      <div class="tabs" data-slot="drawer-tabs">
+        <button class="on" data-tab="timeline">时间线</button>
+        <button class="admin-only" data-tab="rag-evidence">RAG 证据</button>
+        <button class="admin-only" data-tab="agent-branches">Agent 分支</button>
+        <button class="admin-only" data-tab="rule-hits">规则匹配</button>
+      </div>
+      <div class="panel" data-slot="drawer-panel" data-tab-active="timeline"></div>
+      <div class="foot-hint">点击节点高亮该步骤；管理员可切换右侧 tab 查看证据 / Agent / 规则匹配明细。</div>
+    </aside>
+
+  </div>
+</div>

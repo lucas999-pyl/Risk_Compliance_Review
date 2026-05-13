@@ -19,6 +19,8 @@ class AIClientConfig:
     llm_provider: str
     llm_model: str
     timeout_seconds: float
+    llm_base_url: str | None = None
+    llm_api_key: str | None = None
 
 
 class EmbeddingClient:
@@ -99,14 +101,18 @@ class LLMClient:
         }
 
     def _should_call_remote(self) -> bool:
+        base = self.config.llm_base_url or self.config.base_url
+        key = self.config.llm_api_key or self.config.api_key
         return (
             self.config.llm_provider in {"auto", "qwen", "openai_compatible"}
-            and bool(self.config.base_url)
-            and bool(self.config.api_key)
+            and bool(base)
+            and bool(key)
         )
 
     def _remote_chat(self, agent_name: str, verdict: str, reasons: list[str], evidence_snippets: list[str]) -> str:
-        url = f"{self.config.base_url.rstrip('/')}/chat/completions"
+        base = self.config.llm_base_url or self.config.base_url
+        key = self.config.llm_api_key or self.config.api_key
+        url = f"{base.rstrip('/')}/chat/completions"
         prompt = (
             "你是化工合规预审系统中的专业子 Agent。"
             "请只基于给定规则结论和证据片段，用两句话解释判断依据；"
@@ -133,7 +139,7 @@ class LLMClient:
             url,
             data=payload,
             headers={
-                "Authorization": f"Bearer {self.config.api_key}",
+                "Authorization": f"Bearer {key}",
                 "Content-Type": "application/json",
             },
             method="POST",
